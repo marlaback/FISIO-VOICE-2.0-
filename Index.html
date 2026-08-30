@@ -1,0 +1,144 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fisio-Voice UDC | Apoio à Anamnese por Voz</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{ --azul:#0B57D0; --azul-claro:#E8F0FE; --fundo:#F8FAFF; }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',sans-serif; background:var(--fundo); margin:0; color:#1a2b4d; -webkit-font-smoothing:antialiased}
+  header{background:white; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e0e7ff; position:sticky; top:0; z-index:10}
+ .logo{display:flex; align-items:center; gap:10px; font-weight:800; color:var(--azul)}
+ .logo-badge{width:42px; height:42px; background:linear-gradient(135deg,#0B57D0,#FF7A00); border-radius:12px; display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:18px}
+ .phone{max-width:420px; margin:18px auto; background:white; border-radius:32px; box-shadow:0 10px 40px rgba(0,0,0,.12); overflow:hidden; border:5px solid #111; min-height:720px}
+ .status{height:28px; background:black; color:white; display:flex; justify-content:space-between; align-items:center; padding:0 18px; font-size:12px}
+ .topo{padding:18px 18px 24px; text-align:center}
+ .btn-voz{width:118px; height:118px; border-radius:50%; background:linear-gradient(180deg,#0B57D0,#1E88E5); color:white; border:none; font-size:42px; box-shadow:0 12px 24px rgba(11,87,208,.4); margin:18px auto; display:block; cursor:pointer; transition:transform.15s}
+ .btn-voz:active{transform:scale(.96)}
+ .btn-voz.gravando{background:#D93025; animation:pulse 1.2s infinite}
+ .btn-voz.pausado{background:#F29900; animation:none}
+  @keyframes pulse{0%{transform:scale(1)} 50%{transform:scale(1.08)} 100%{transform:scale(1)}}
+ .card{background:var(--azul-claro); border-radius:16px; padding:14px 16px; margin:12px 16px; text-align:left; font-size:13px; line-height:1.4}
+ .card.branco{background:white; border:1px solid #DDE6FF}
+ .wave{height:70px; margin:12px 0; display:flex; align-items:center; justify-content:center; gap:4px}
+ .bar{width:4px; background:var(--azul); border-radius:10px; height:12px; transition:height.15s}
+ .bar.anim{animation:wave.8s infinite ease-in-out}
+  @keyframes wave{0%,100%{height:12px} 50%{height:58px}}
+ .aviso{background:#FFF8C4; border-radius:12px; padding:10px; font-size:11px; text-align:center; margin:12px 16px; border:1px solid #f5e6a0}
+ .btn{width:100%; padding:14px; border-radius:12px; border:none; font-weight:700; cursor:pointer; font-size:14px}
+ .btn-primario{background:var(--azul); color:white}
+ .btn-sec{background:white; border:2px solid var(--azul); color:var(--azul)}
+ .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 16px 16px}
+ .timer{font-size:46px; font-weight:800; color:#12306b; text-align:center; font-variant-numeric:tabular-nums}
+ .bottom-nav{display:flex; justify-content:space-around; padding:12px 0; border-top:1px solid #eef2ff; font-size:11px; color:#6b7a99}
+ .erro{background:#FCE8E6; color:#A50E0E; border:1px solid #f5c6c2; padding:10px; border-radius:12px; margin:10px 16px; font-size:12px; display:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-badge">U</div> UDC <span style="font-weight:400">Centro Universitário</span></div>
+  <div style="font-size:11px; background:var(--azul-claro); padding:6px 10px; border-radius:20px; color:var(--azul)">Fisioterapia</div>
+</header>
+
+<div class="phone">
+  <div class="status"><span>9:41</span><span>● ● ●</span><span>85%</span></div>
+
+  <div id="tela1" class="topo">
+    <div style="color:var(--azul); font-weight:700; font-size:12px; margin-top:10px">ANAMNESE FISIOTERAPÊUTICA POR VOZ</div>
+    <h2 style="margin:8px 0; font-size:20px">Olá, Dra. Ana<br><span style="font-weight:400; font-size:13px; color:#5a6d8a">Pronta para iniciar a anamnese?</span></h2>
+    <button type="button" class="btn-voz" id="btnGravar" onclick="iniciarGravacao()" aria-label="Iniciar gravação">🎤</button>
+    <strong>Toque para gravar</strong>
+    <p style="font-size:12px; color:#666">Fale sintomas e histórico.<br>A IA organiza, resume e sugere próximos passos.</p>
+    <div id="msgErro" class="erro"></div>
+    <div class="card branco">📋 <b>Organizar entrevista</b><br><small>Estrutura por etapas da anamnese</small></div>
+    <div class="card branco">💡 <b>Sugerir próximos passos</b><br><small>Testes e avaliações físicas</small></div>
+    <div class="card branco">📝 <b>Resumir informações</b><br><small>Gera resumo clínico estruturado</small></div>
+    <div class="aviso">ℹ️ <b>Apoio à decisão, não substitui o julgamento clínico do fisioterapeuta</b></div>
+    <div class="bottom-nav"><div>🏠<br>Início</div><div>👥<br>Pacientes</div><div>🕒<br>Histórico</div><div>⚙️<br>Ajustes</div></div>
+  </div>
+
+  <div id="tela2" class="topo" style="display:none">
+    <h3 style="color:var(--azul)">Gravação Ativa por Voz</h3>
+    <span style="background:var(--azul); color:white; padding:5px 14px; border-radius:20px; font-size:12px" id="statusBadge">● GRAVANDO</span>
+    <div class="wave" id="wave"></div>
+    <div class="timer" id="timer">00:00</div>
+    <small style="color:#6b7a99">Tempo de gravação</small>
+    <div class="card" style="background:#E8F0FE; text-align:left">
+      <b>🎙️ Transcrição em tempo real</b>
+      <div id="transcricao" style="margin-top:8px; min-height:70px">Aguardando fala...</div>
+      <small style="color:#7a8ab0" id="statusMic"><i>Captando áudio...</i></small>
+    </div>
+    <div class="grid2">
+      <button type="button" class="btn btn-sec" id="btnPausar" onclick="togglePausa()">⏸️ Pausar</button>
+      <button type="button" class="btn btn-primario" onclick="gerarResumo()">⏹️ Parar e Resumir</button>
+    </div>
+  </div>
+
+  <div id="tela3" class="topo" style="display:none; text-align:left">
+    <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">Resumo - IA</h3><small style="background:var(--azul-claro); padding:4px 8px; border-radius:20px">✨ gerado agora</small></div>
+    <div class="card"><b>Queixa principal</b><br><span id="res-queixa">Dor lombar irradiando para perna esquerda há 5 dias</span></div>
+    <div class="card branco"><b>📋 Histórico</b><br><small id="res-hist">• Paciente relatou dor lombar.<br>• Início após esforço físico.<br>• Sem cirurgia prévia.<br>• Sem febre / sem alteração esfincteriana.</small></div>
+    <div class="card branco"><b>Escala: <span id="res-dor">6/10 — Dor moderada</span></b><div style="height:8px; background:#e0e7ff; border-radius:10px; margin-top:6px"><div id="barraDor" style="width:60%; height:100%; background:var(--azul); border-radius:10px"></div></div></div>
+    <div class="card branco"><b>⇅ Fatores</b><br><small style="color:green">✔ Melhora: Repouso e calor local</small><br><small style="color:#C07600">⚠ Piora: Sentado &gt;30min, tosse, flexão tronco</small></div>
+    <div class="card branco"><b>🩺 Sugestão de próximos passos:</b><br><small>• Teste de Lasègue — dor ciática por tração do ciático<br>• Palpação lombar L4-L5 e L5-S1<br>• Teste de força e reflexos patelar/Aquileu<br>• Avaliar ADM lombar e marcha</small></div>
+    <div class="aviso">Apoio à decisão, não substitui o julgamento clínico</div>
+    <div class="grid2"><button type="button" class="btn btn-sec" onclick="salvar()">Salvar no prontuário</button><button type="button" class="btn btn-primario" onclick="location.reload()">Nova anamnese</button></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let rec=null, segundos=0, intervalo=null, gravando=false, pausado=false, textoFinal='';
+const waveEl = $('wave');
+for(let i=0;i<16;i++){ const d=document.createElement('div'); d.className='bar anim'; d.style.animationDelay=(i*0.08)+'s'; waveEl.appendChild(d); }
+
+function mostrarErro(msg){ const e=$('msgErro'); e.style.display='block'; e.innerText='⚠️ '+msg; setTimeout(()=>e.style.display='none',5000); }
+
+function iniciarGravacao(){
+  if(location.protocol!== 'https:' && location.hostname!== 'localhost'){ mostrarErro('Use HTTPS para ativar o microfone. No GitHub Pages já funciona com https.'); }
+  $('tela1').style.display='none'; $('tela2').style.display='block';
+  segundos=0; textoFinal=''; gravando=true; pausado=false;
+  atualizarTimer(); intervalo=setInterval(atualizarTimer,1000);
+  animarWave(true); $('btnGravar').classList.add('gravando');
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ $('transcricao').innerText='Seu navegador não suporta reconhecimento de voz. Use Google Chrome ou Edge.'; return; }
+  rec = new SR(); rec.lang='pt-BR'; rec.continuous=true; rec.interimResults=true;
+  rec.onstart = ()=>{ $('statusMic').innerText='Ouvindo...'; $('statusBadge').innerText='● GRAVANDO'; };
+  rec.onresult = (e)=>{
+    let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal) textoFinal+=t+' '; else interim+=t; }
+    const completo = textoFinal + interim; $('transcricao').innerText = completo || 'Ouvindo...';
+    processarTexto(completo);
+  };
+  rec.onerror = (e)=>{ if(e.error==='not-allowed') mostrarErro('Permissão do microfone negada. Clique no cadeado do navegador e permita.'); else if(e.error==='no-speech') $('statusMic').innerText='Não detectei fala. Fale mais próximo.'; else mostrarErro('Erro no microfone: '+e.error); };
+  rec.onend = ()=>{ if(gravando &&!pausado){ try{ rec.start(); }catch{} } };
+  try{ rec.start(); }catch(err){ mostrarErro(err.message); }
+}
+
+function atualizarTimer(){ segundos++; const m=String(Math.floor(segundos/60)).padStart(2,'0'); const s=String(segundos%60).padStart(2,'0'); $('timer').innerText=m+':'+s; }
+
+function togglePausa(){
+  if(!rec) return;
+  if(!pausado){ rec.stop(); clearInterval(intervalo); pausado=true; $('btnPausar').innerText='▶️ Continuar'; $('statusBadge').innerText='● PAUSADO'; $('statusBadge').style.background='#F29900'; animarWave(false); $('btnGravar').classList.add('pausado'); }
+  else { try{ rec.start(); }catch{} intervalo=setInterval(atualizarTimer,1000); pausado=false; $('btnPausar').innerText='⏸️ Pausar'; $('statusBadge').innerText='● GRAVANDO'; $('statusBadge').style.background='var(--azul)'; animarWave(true); $('btnGravar').classList.remove('pausado'); }
+}
+
+function pararGravacao(){ gravando=false; pausado=false; if(rec) try{ rec.stop(); }catch{} clearInterval(intervalo); animarWave(false); }
+
+function animarWave(on){ document.querySelectorAll('.bar').forEach(b=>{ b.classList.toggle('anim', on); if(!on) b.style.height='12px'; }); }
+
+function processarTexto(t){
+  if(!t) return; $('res-queixa').innerText = t.slice(0,120);
+  $('res-hist').innerHTML = '• ' + t.slice(0,200);
+  const m = t.match(/(\d{1,2})\s*\/\s*10/); if(m){ const v=parseInt(m[1]); $('res-dor').innerText = v+'/10 — '+(v<=3?'Leve':v<=6?'Moderada':'Intensa'); $('barraDor').style.width = (v*10)+'%'; }
+}
+
+function gerarResumo(){ pararGravacao(); $('tela2').style.display='none'; $('tela3').style.display='block'; }
+
+function salvar(){ const dados={queixa:$('res-queixa').innerText, texto:textoFinal || $('transcricao').innerText, data:new Date().toISOString()}; localStorage.setItem('fisioVoice_prontuario', JSON.stringify(dados)); alert('✅ Salvo no prontuário (localStorage). Em produção, enviar para seu backend.'); }
+</script>
+</body>
+                                                                                                                                                                   </html>
