@@ -1,144 +1,764 @@
+from pathlib import Path
 
-<!DOCTYPE html>
+src = Path("/mnt/data/Texto colado.txt").read_text(encoding="utf-8")
+
+# Rebuild the supplied single-file app with corrected state handling,
+# timer behavior, microphone errors, responsive layout and local persistence.
+html = r'''<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0B57D0">
 <title>Fisio-Voice UDC | Apoio à Anamnese por Voz</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
-  :root{ --azul:#0B57D0; --azul-claro:#E8F0FE; --fundo:#F8FAFF; }
-  *{box-sizing:border-box}
-  body{font-family:'Inter',sans-serif; background:var(--fundo); margin:0; color:#1a2b4d; -webkit-font-smoothing:antialiased}
-  header{background:white; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e0e7ff; position:sticky; top:0; z-index:10}
- .logo{display:flex; align-items:center; gap:10px; font-weight:800; color:var(--azul)}
- .logo-badge{width:42px; height:42px; background:linear-gradient(135deg,#0B57D0,#FF7A00); border-radius:12px; display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:18px}
- .phone{max-width:420px; margin:18px auto; background:white; border-radius:32px; box-shadow:0 10px 40px rgba(0,0,0,.12); overflow:hidden; border:5px solid #111; min-height:720px}
- .status{height:28px; background:black; color:white; display:flex; justify-content:space-between; align-items:center; padding:0 18px; font-size:12px}
- .topo{padding:18px 18px 24px; text-align:center}
- .btn-voz{width:118px; height:118px; border-radius:50%; background:linear-gradient(180deg,#0B57D0,#1E88E5); color:white; border:none; font-size:42px; box-shadow:0 12px 24px rgba(11,87,208,.4); margin:18px auto; display:block; cursor:pointer; transition:transform.15s}
- .btn-voz:active{transform:scale(.96)}
- .btn-voz.gravando{background:#D93025; animation:pulse 1.2s infinite}
- .btn-voz.pausado{background:#F29900; animation:none}
-  @keyframes pulse{0%{transform:scale(1)} 50%{transform:scale(1.08)} 100%{transform:scale(1)}}
- .card{background:var(--azul-claro); border-radius:16px; padding:14px 16px; margin:12px 16px; text-align:left; font-size:13px; line-height:1.4}
- .card.branco{background:white; border:1px solid #DDE6FF}
- .wave{height:70px; margin:12px 0; display:flex; align-items:center; justify-content:center; gap:4px}
- .bar{width:4px; background:var(--azul); border-radius:10px; height:12px; transition:height.15s}
- .bar.anim{animation:wave.8s infinite ease-in-out}
-  @keyframes wave{0%,100%{height:12px} 50%{height:58px}}
- .aviso{background:#FFF8C4; border-radius:12px; padding:10px; font-size:11px; text-align:center; margin:12px 16px; border:1px solid #f5e6a0}
- .btn{width:100%; padding:14px; border-radius:12px; border:none; font-weight:700; cursor:pointer; font-size:14px}
- .btn-primario{background:var(--azul); color:white}
- .btn-sec{background:white; border:2px solid var(--azul); color:var(--azul)}
- .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 16px 16px}
- .timer{font-size:46px; font-weight:800; color:#12306b; text-align:center; font-variant-numeric:tabular-nums}
- .bottom-nav{display:flex; justify-content:space-around; padding:12px 0; border-top:1px solid #eef2ff; font-size:11px; color:#6b7a99}
- .erro{background:#FCE8E6; color:#A50E0E; border:1px solid #f5c6c2; padding:10px; border-radius:12px; margin:10px 16px; font-size:12px; display:none}
+:root{
+  --azul:#0B57D0;
+  --azul-2:#1E88E5;
+  --azul-claro:#E8F0FE;
+  --fundo:#F6F8FC;
+  --texto:#172B4D;
+  --muted:#66758F;
+  --borda:#DDE6F5;
+  --perigo:#D93025;
+  --pausa:#F29900;
+  --sucesso:#188038;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:Inter,Arial,sans-serif;
+  background:var(--fundo);
+  color:var(--texto);
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit}
+button:focus-visible{
+  outline:3px solid rgba(11,87,208,.28);
+  outline-offset:3px;
+}
+header{
+  min-height:70px;
+  background:#fff;
+  padding:12px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom:1px solid var(--borda);
+  position:sticky;
+  top:0;
+  z-index:20;
+}
+.logo{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight:800;
+  color:var(--azul);
+}
+.logo-badge{
+  width:40px;height:40px;
+  display:grid;place-items:center;
+  border-radius:12px;
+  color:#fff;
+  background:linear-gradient(135deg,var(--azul),#FF7A00);
+}
+.logo-sub{font-weight:400;color:var(--muted)}
+.tag{
+  white-space:nowrap;
+  background:var(--azul-claro);
+  color:var(--azul);
+  padding:7px 11px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:600;
+}
+.phone{
+  width:min(100%,430px);
+  min-height:720px;
+  margin:18px auto;
+  background:#fff;
+  border:5px solid #111;
+  border-radius:32px;
+  overflow:hidden;
+  box-shadow:0 12px 40px rgba(15,35,70,.13);
+}
+.status{
+  height:28px;
+  padding:0 15px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:#000;
+  color:#fff;
+  font-size:11px;
+}
+.tela{padding:20px 16px 0}
+.tela.center{text-align:center}
+.eyebrow{
+  color:var(--azul);
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.2px;
+  margin-top:6px;
+}
+h2,h3{color:var(--texto)}
+h2{font-size:20px;line-height:1.25;margin:9px 0}
+h3{margin:0;font-size:18px}
+.subtitulo{font-size:13px;color:var(--muted);font-weight:400}
+.btn-voz{
+  width:118px;height:118px;
+  margin:20px auto 14px;
+  display:grid;place-items:center;
+  border:0;border-radius:50%;
+  cursor:pointer;
+  color:#fff;
+  font-size:42px;
+  background:linear-gradient(180deg,var(--azul),var(--azul-2));
+  box-shadow:0 12px 26px rgba(11,87,208,.35);
+  transition:transform .15s,box-shadow .15s;
+}
+.btn-voz:hover{transform:translateY(-2px)}
+.btn-voz:active{transform:scale(.96)}
+.btn-voz.gravando{
+  background:var(--perigo);
+  animation:pulse 1.2s infinite;
+}
+@keyframes pulse{
+  0%,100%{box-shadow:0 10px 25px rgba(217,48,37,.28)}
+  50%{box-shadow:0 10px 34px rgba(217,48,37,.55)}
+}
+.card{
+  margin:12px 0;
+  padding:14px 15px;
+  border-radius:16px;
+  background:var(--azul-claro);
+  font-size:13px;
+  line-height:1.45;
+}
+.card.branco{
+  background:#fff;
+  border:1px solid var(--borda);
+}
+.card b{font-weight:700}
+.aviso{
+  margin:12px 0;
+  padding:10px;
+  border:1px solid #F1E39C;
+  border-radius:12px;
+  background:#FFF8C4;
+  color:#5f541e;
+  text-align:center;
+  font-size:11px;
+  line-height:1.35;
+}
+.erro{
+  display:none;
+  margin:10px 0;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid #F5C6C2;
+  background:#FCE8E6;
+  color:#A50E0E;
+  font-size:12px;
+  text-align:left;
+}
+.sucesso{
+  display:none;
+  margin:10px 0;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#E6F4EA;
+  color:#137333;
+  font-size:12px;
+  text-align:center;
+}
+.wave{
+  height:70px;
+  margin:14px 0 5px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+}
+.bar{
+  width:4px;
+  height:12px;
+  border-radius:10px;
+  background:var(--azul);
+}
+.bar.anim{animation:wave .8s infinite ease-in-out}
+@keyframes wave{
+  0%,100%{height:12px}
+  50%{height:58px}
+}
+.timer{
+  margin-top:3px;
+  text-align:center;
+  font-size:46px;
+  line-height:1;
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+  color:#12306B;
+}
+.status-badge{
+  display:inline-block;
+  margin-top:9px;
+  padding:5px 13px;
+  border-radius:999px;
+  background:var(--azul);
+  color:#fff;
+  font-size:11px;
+  font-weight:700;
+}
+.transcricao{
+  min-height:90px;
+  max-height:210px;
+  overflow:auto;
+  margin-top:8px;
+  padding:9px;
+  border-radius:10px;
+  background:rgba(255,255,255,.7);
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.mic-status{display:block;margin-top:7px;color:var(--muted);font-size:11px}
+.grid2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:12px 0 16px;
+}
+.btn{
+  width:100%;
+  min-height:48px;
+  padding:12px 10px;
+  border-radius:12px;
+  border:0;
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+}
+.btn-primario{background:var(--azul);color:#fff}
+.btn-sec{background:#fff;color:var(--azul);border:2px solid var(--azul)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.resumo-topo{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:6px;
+}
+.gerado{
+  background:var(--azul-claro);
+  color:var(--azul);
+  padding:5px 8px;
+  border-radius:999px;
+  font-size:10px;
+  white-space:nowrap;
+}
+.barra{
+  height:8px;
+  margin-top:7px;
+  overflow:hidden;
+  border-radius:10px;
+  background:#E0E7FF;
+}
+.barra > div{
+  width:0%;
+  height:100%;
+  border-radius:10px;
+  background:var(--azul);
+  transition:width .25s;
+}
+.fator-melhora{color:var(--sucesso)}
+.fator-piora{color:#B26A00}
+.bottom-nav{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border-top:1px solid #EEF2FF;
+  margin:4px -16px 0;
+  padding:11px 0;
+  color:#6B7A99;
+  font-size:10px;
+  text-align:center;
+}
+.bottom-nav button{
+  border:0;background:transparent;color:inherit;cursor:pointer;
+}
+.bottom-nav button:hover{color:var(--azul)}
+small{line-height:1.45}
+@media(max-width:480px){
+  header{padding:10px 14px}
+  .logo-sub{display:none}
+  .phone{
+    width:100%;
+    min-height:calc(100vh - 70px);
+    margin:0;
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+  }
+  .status{height:25px}
+}
+@media(max-width:360px){
+  .grid2{grid-template-columns:1fr}
+  .btn-voz{width:105px;height:105px}
+}
 </style>
 </head>
+
 <body>
 <header>
-  <div class="logo"><div class="logo-badge">U</div> UDC <span style="font-weight:400">Centro Universitário</span></div>
-  <div style="font-size:11px; background:var(--azul-claro); padding:6px 10px; border-radius:20px; color:var(--azul)">Fisioterapia</div>
+  <div class="logo">
+    <div class="logo-badge">U</div>
+    <span>UDC <span class="logo-sub">Centro Universitário</span></span>
+  </div>
+  <div class="tag">Fisioterapia</div>
 </header>
 
-<div class="phone">
-  <div class="status"><span>9:41</span><span>● ● ●</span><span>85%</span></div>
+<main class="phone">
+  <div class="status">
+    <span id="horaStatus">09:41</span>
+    <span>● ● ●</span>
+    <span>85%</span>
+  </div>
 
-  <div id="tela1" class="topo">
-    <div style="color:var(--azul); font-weight:700; font-size:12px; margin-top:10px">ANAMNESE FISIOTERAPÊUTICA POR VOZ</div>
-    <h2 style="margin:8px 0; font-size:20px">Olá, Dra. Ana<br><span style="font-weight:400; font-size:13px; color:#5a6d8a">Pronta para iniciar a anamnese?</span></h2>
-    <button type="button" class="btn-voz" id="btnGravar" onclick="iniciarGravacao()" aria-label="Iniciar gravação">🎤</button>
-    <strong>Toque para gravar</strong>
-    <p style="font-size:12px; color:#666">Fale sintomas e histórico.<br>A IA organiza, resume e sugere próximos passos.</p>
-    <div id="msgErro" class="erro"></div>
+  <!-- TELA 1 -->
+  <section id="tela1" class="tela center">
+    <div class="eyebrow">ANAMNESE FISIOTERAPÊUTICA POR VOZ</div>
+    <h2>Olá, Dra. Ana<br><span class="subtitulo">Pronta para iniciar a anamnese?</span></h2>
+
+    <button type="button" class="btn-voz" id="btnGravar"
+      aria-label="Iniciar gravação" aria-pressed="false">🎤</button>
+    <strong id="textoBotao">Toque para gravar</strong>
+    <p class="subtitulo">
+      Fale sintomas e histórico.<br>
+      A IA organiza, resume e sugere próximos passos.
+    </p>
+
+    <div id="msgErro" class="erro" role="alert"></div>
+    <div id="msgSucesso" class="sucesso" role="status"></div>
+
     <div class="card branco">📋 <b>Organizar entrevista</b><br><small>Estrutura por etapas da anamnese</small></div>
     <div class="card branco">💡 <b>Sugerir próximos passos</b><br><small>Testes e avaliações físicas</small></div>
     <div class="card branco">📝 <b>Resumir informações</b><br><small>Gera resumo clínico estruturado</small></div>
-    <div class="aviso">ℹ️ <b>Apoio à decisão, não substitui o julgamento clínico do fisioterapeuta</b></div>
-    <div class="bottom-nav"><div>🏠<br>Início</div><div>👥<br>Pacientes</div><div>🕒<br>Histórico</div><div>⚙️<br>Ajustes</div></div>
-  </div>
 
-  <div id="tela2" class="topo" style="display:none">
-    <h3 style="color:var(--azul)">Gravação Ativa por Voz</h3>
-    <span style="background:var(--azul); color:white; padding:5px 14px; border-radius:20px; font-size:12px" id="statusBadge">● GRAVANDO</span>
-    <div class="wave" id="wave"></div>
+    <div class="aviso">ℹ️ <b>Apoio à decisão, não substitui o julgamento clínico do fisioterapeuta.</b></div>
+
+    <nav class="bottom-nav" aria-label="Navegação">
+      <button type="button">🏠<br>Início</button>
+      <button type="button">👥<br>Pacientes</button>
+      <button type="button">🕒<br>Histórico</button>
+      <button type="button">⚙️<br>Ajustes</button>
+    </nav>
+  </section>
+
+  <!-- TELA 2 -->
+  <section id="tela2" class="tela center" hidden>
+    <h3>Gravação Ativa por Voz</h3>
+    <span class="status-badge" id="statusBadge">● GRAVANDO</span>
+
+    <div class="wave" id="wave" aria-hidden="true"></div>
     <div class="timer" id="timer">00:00</div>
-    <small style="color:#6b7a99">Tempo de gravação</small>
-    <div class="card" style="background:#E8F0FE; text-align:left">
-      <b>🎙️ Transcrição em tempo real</b>
-      <div id="transcricao" style="margin-top:8px; min-height:70px">Aguardando fala...</div>
-      <small style="color:#7a8ab0" id="statusMic"><i>Captando áudio...</i></small>
-    </div>
-    <div class="grid2">
-      <button type="button" class="btn btn-sec" id="btnPausar" onclick="togglePausa()">⏸️ Pausar</button>
-      <button type="button" class="btn btn-primario" onclick="gerarResumo()">⏹️ Parar e Resumir</button>
-    </div>
-  </div>
+    <small class="subtitulo">Tempo de gravação</small>
 
-  <div id="tela3" class="topo" style="display:none; text-align:left">
-    <div style="display:flex; justify-content:space-between; align-items:center"><h3 style="margin:0">Resumo - IA</h3><small style="background:var(--azul-claro); padding:4px 8px; border-radius:20px">✨ gerado agora</small></div>
-    <div class="card"><b>Queixa principal</b><br><span id="res-queixa">Dor lombar irradiando para perna esquerda há 5 dias</span></div>
-    <div class="card branco"><b>📋 Histórico</b><br><small id="res-hist">• Paciente relatou dor lombar.<br>• Início após esforço físico.<br>• Sem cirurgia prévia.<br>• Sem febre / sem alteração esfincteriana.</small></div>
-    <div class="card branco"><b>Escala: <span id="res-dor">6/10 — Dor moderada</span></b><div style="height:8px; background:#e0e7ff; border-radius:10px; margin-top:6px"><div id="barraDor" style="width:60%; height:100%; background:var(--azul); border-radius:10px"></div></div></div>
-    <div class="card branco"><b>⇅ Fatores</b><br><small style="color:green">✔ Melhora: Repouso e calor local</small><br><small style="color:#C07600">⚠ Piora: Sentado &gt;30min, tosse, flexão tronco</small></div>
-    <div class="card branco"><b>🩺 Sugestão de próximos passos:</b><br><small>• Teste de Lasègue — dor ciática por tração do ciático<br>• Palpação lombar L4-L5 e L5-S1<br>• Teste de força e reflexos patelar/Aquileu<br>• Avaliar ADM lombar e marcha</small></div>
-    <div class="aviso">Apoio à decisão, não substitui o julgamento clínico</div>
-    <div class="grid2"><button type="button" class="btn btn-sec" onclick="salvar()">Salvar no prontuário</button><button type="button" class="btn btn-primario" onclick="location.reload()">Nova anamnese</button></div>
-  </div>
-</div>
+    <div class="card">
+      <b>🎙️ Transcrição em tempo real</b>
+      <div class="transcricao" id="transcricao" aria-live="polite">Aguardando fala...</div>
+      <small class="mic-status" id="statusMic">Preparando microfone...</small>
+    </div>
+
+    <div class="grid2">
+      <button type="button" class="btn btn-sec" id="btnPausar">⏸️ Pausar</button>
+      <button type="button" class="btn btn-primario" id="btnParar">⏹️ Parar e Resumir</button>
+    </div>
+  </section>
+
+  <!-- TELA 3 -->
+  <section id="tela3" class="tela" hidden>
+    <div class="resumo-topo">
+      <h3>Resumo - IA</h3>
+      <small class="gerado">✨ gerado agora</small>
+    </div>
+
+    <div class="card">
+      <b>Queixa principal</b><br>
+      <span id="res-queixa">Aguardando informações da anamnese.</span>
+    </div>
+
+    <div class="card branco">
+      <b>📋 Histórico</b><br>
+      <small id="res-hist">Nenhum histórico transcrito.</small>
+    </div>
+
+    <div class="card branco">
+      <b>Escala: <span id="res-dor">Não informada</span></b>
+      <div class="barra"><div id="barraDor"></div></div>
+    </div>
+
+    <div class="card branco">
+      <b>⇅ Fatores</b><br>
+      <small class="fator-melhora">✔ Melhora: informações não identificadas automaticamente.</small><br>
+      <small class="fator-piora">⚠ Piora: informações não identificadas automaticamente.</small>
+    </div>
+
+    <div class="card branco">
+      <b>🩺 Sugestão de próximos passos</b><br>
+      <small>
+        • Realizar avaliação fisioterapêutica completa.<br>
+        • Correlacionar história, exame físico e sinais/sintomas.<br>
+        • Selecionar testes e medidas conforme a hipótese clínica.
+      </small>
+    </div>
+
+    <div class="aviso">Apoio à decisão, não substitui o julgamento clínico.</div>
+
+    <div class="grid2">
+      <button type="button" class="btn btn-sec" id="btnSalvar">Salvar no prontuário</button>
+      <button type="button" class="btn btn-primario" id="btnNova">Nova anamnese</button>
+    </div>
+  </section>
+</main>
 
 <script>
-const $ = id => document.getElementById(id);
-let rec=null, segundos=0, intervalo=null, gravando=false, pausado=false, textoFinal='';
-const waveEl = $('wave');
-for(let i=0;i<16;i++){ const d=document.createElement('div'); d.className='bar anim'; d.style.animationDelay=(i*0.08)+'s'; waveEl.appendChild(d); }
+(() => {
+  "use strict";
 
-function mostrarErro(msg){ const e=$('msgErro'); e.style.display='block'; e.innerText='⚠️ '+msg; setTimeout(()=>e.style.display='none',5000); }
+  const $ = (id) => document.getElementById(id);
 
-function iniciarGravacao(){
-  if(location.protocol!== 'https:' && location.hostname!== 'localhost'){ mostrarErro('Use HTTPS para ativar o microfone. No GitHub Pages já funciona com https.'); }
-  $('tela1').style.display='none'; $('tela2').style.display='block';
-  segundos=0; textoFinal=''; gravando=true; pausado=false;
-  atualizarTimer(); intervalo=setInterval(atualizarTimer,1000);
-  animarWave(true); $('btnGravar').classList.add('gravando');
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ $('transcricao').innerText='Seu navegador não suporta reconhecimento de voz. Use Google Chrome ou Edge.'; return; }
-  rec = new SR(); rec.lang='pt-BR'; rec.continuous=true; rec.interimResults=true;
-  rec.onstart = ()=>{ $('statusMic').innerText='Ouvindo...'; $('statusBadge').innerText='● GRAVANDO'; };
-  rec.onresult = (e)=>{
-    let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal) textoFinal+=t+' '; else interim+=t; }
-    const completo = textoFinal + interim; $('transcricao').innerText = completo || 'Ouvindo...';
-    processarTexto(completo);
+  const state = {
+    recognition: null,
+    gravando: false,
+    pausado: false,
+    segundos: 0,
+    timerId: null,
+    textoFinal: "",
+    textoInterim: "",
+    restartRecognition: false
   };
-  rec.onerror = (e)=>{ if(e.error==='not-allowed') mostrarErro('Permissão do microfone negada. Clique no cadeado do navegador e permita.'); else if(e.error==='no-speech') $('statusMic').innerText='Não detectei fala. Fale mais próximo.'; else mostrarErro('Erro no microfone: '+e.error); };
-  rec.onend = ()=>{ if(gravando &&!pausado){ try{ rec.start(); }catch{} } };
-  try{ rec.start(); }catch(err){ mostrarErro(err.message); }
-}
 
-function atualizarTimer(){ segundos++; const m=String(Math.floor(segundos/60)).padStart(2,'0'); const s=String(segundos%60).padStart(2,'0'); $('timer').innerText=m+':'+s; }
+  const telas = [$("tela1"), $("tela2"), $("tela3")];
 
-function togglePausa(){
-  if(!rec) return;
-  if(!pausado){ rec.stop(); clearInterval(intervalo); pausado=true; $('btnPausar').innerText='▶️ Continuar'; $('statusBadge').innerText='● PAUSADO'; $('statusBadge').style.background='#F29900'; animarWave(false); $('btnGravar').classList.add('pausado'); }
-  else { try{ rec.start(); }catch{} intervalo=setInterval(atualizarTimer,1000); pausado=false; $('btnPausar').innerText='⏸️ Pausar'; $('statusBadge').innerText='● GRAVANDO'; $('statusBadge').style.background='var(--azul)'; animarWave(true); $('btnGravar').classList.remove('pausado'); }
-}
+  function mostrarTela(tela) {
+    telas.forEach(el => {
+      el.hidden = el !== tela;
+    });
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
 
-function pararGravacao(){ gravando=false; pausado=false; if(rec) try{ rec.stop(); }catch{} clearInterval(intervalo); animarWave(false); }
+  function mostrarErro(msg) {
+    const el = $("msgErro");
+    el.textContent = "⚠️ " + msg;
+    el.style.display = "block";
+  }
 
-function animarWave(on){ document.querySelectorAll('.bar').forEach(b=>{ b.classList.toggle('anim', on); if(!on) b.style.height='12px'; }); }
+  function limparMensagens() {
+    $("msgErro").style.display = "none";
+    $("msgSucesso").style.display = "none";
+  }
 
-function processarTexto(t){
-  if(!t) return; $('res-queixa').innerText = t.slice(0,120);
-  $('res-hist').innerHTML = '• ' + t.slice(0,200);
-  const m = t.match(/(\d{1,2})\s*\/\s*10/); if(m){ const v=parseInt(m[1]); $('res-dor').innerText = v+'/10 — '+(v<=3?'Leve':v<=6?'Moderada':'Intensa'); $('barraDor').style.width = (v*10)+'%'; }
-}
+  function mostrarSucesso(msg) {
+    const el = $("msgSucesso");
+    el.textContent = "✅ " + msg;
+    el.style.display = "block";
+  }
 
-function gerarResumo(){ pararGravacao(); $('tela2').style.display='none'; $('tela3').style.display='block'; }
+  function formatarTempo(total) {
+    const m = String(Math.floor(total / 60)).padStart(2, "0");
+    const s = String(total % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
 
-function salvar(){ const dados={queixa:$('res-queixa').innerText, texto:textoFinal || $('transcricao').innerText, data:new Date().toISOString()}; localStorage.setItem('fisioVoice_prontuario', JSON.stringify(dados)); alert('✅ Salvo no prontuário (localStorage). Em produção, enviar para seu backend.'); }
-</script>
-</body>
-                                                                                                                                                                   </html>
+  function iniciarTimer() {
+    clearInterval(state.timerId);
+    state.timerId = setInterval(() => {
+      if (!state.pausado && state.gravando) {
+        state.segundos++;
+        $("timer").textContent = formatarTempo(state.segundos);
+      }
+    }, 1000);
+  }
+
+  function pararTimer() {
+    clearInterval(state.timerId);
+    state.timerId = null;
+  }
+
+  function criarWave() {
+    const wave = $("wave");
+    wave.innerHTML = "";
+    for (let i = 0; i < 16; i++) {
+      const bar = document.createElement("div");
+      bar.className = "bar anim";
+      bar.style.animationDelay = `${i * 0.08}s`;
+      wave.appendChild(bar);
+    }
+  }
+
+  function animarWave(ativo) {
+    document.querySelectorAll(".bar").forEach(bar => {
+      bar.classList.toggle("anim", ativo);
+      if (!ativo) bar.style.height = "12px";
+    });
+  }
+
+  function atualizarStatusGravacao() {
+    const badge = $("statusBadge");
+    const botao = $("btnPausar");
+
+    if (state.pausado) {
+      badge.textContent = "● PAUSADO";
+      badge.style.background = "var(--pausa)";
+      botao.textContent = "▶️ Continuar";
+      $("statusMic").textContent = "Gravação pausada.";
+    } else {
+      badge.textContent = "● GRAVANDO";
+      badge.style.background = "var(--azul)";
+      botao.textContent = "⏸️ Pausar";
+      $("statusMic").textContent = "Ouvindo...";
+    }
+  }
+
+  function obterReconhecimento() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    rec.onstart = () => {
+      if (!state.pausado) {
+        $("statusMic").textContent = "Ouvindo...";
+        atualizarStatusGravacao();
+      }
+    };
+
+    rec.onresult = (event) => {
+      let interim = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const texto = event.results[i][0].transcript.trim();
+        if (!texto) continue;
+
+        if (event.results[i].isFinal) {
+          state.textoFinal += texto + " ";
+        } else {
+          interim += texto + " ";
+        }
+      }
+
+      state.textoInterim = interim;
+      const completo = (state.textoFinal + state.textoInterim).trim();
+
+      $("transcricao").textContent = completo || "Ouvindo...";
+      processarTexto(completo);
+    };
+
+    rec.onerror = (event) => {
+      const erros = {
+        "not-allowed": "Permissão do microfone negada. Permita o microfone nas configurações do navegador.",
+        "service-not-allowed": "O reconhecimento de voz foi bloqueado pelo navegador.",
+        "audio-capture": "Não foi possível acessar o microfone. Verifique se ele está disponível.",
+        "network": "Falha de conexão com o serviço de reconhecimento de voz.",
+        "no-speech": "Nenhuma fala detectada. Continue falando quando estiver pronto."
+      };
+
+      $("statusMic").textContent = erros[event.error] || `Erro no reconhecimento: ${event.error}`;
+
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        pararGravacao(false);
+        mostrarTela($("tela1"));
+        mostrarErro(erros[event.error]);
+      }
+    };
+
+    rec.onend = () => {
+      if (state.gravando && !state.pausado && state.restartRecognition) {
+        setTimeout(() => {
+          if (!state.gravando || state.pausado || !state.recognition) return;
+          try {
+            state.recognition.start();
+          } catch (_) {}
+        }, 250);
+      }
+    };
+
+    return rec;
+  }
+
+  function iniciarGravacao() {
+    limparMensagens();
+
+    if (!window.isSecureContext &&
+        location.hostname !== "localhost" &&
+        location.hostname !== "127.0.0.1") {
+      mostrarErro("O microfone precisa de HTTPS. No GitHub Pages, abra o endereço pela versão HTTPS.");
+      return;
+    }
+
+    state.gravando = true;
+    state.pausado = false;
+    state.segundos = 0;
+    state.textoFinal = "";
+    state.textoInterim = "";
+    state.restartRecognition = true;
+
+    $("timer").textContent = "00:00";
+    $("transcricao").textContent = "Aguardando fala...";
+    $("btnGravar").classList.add("gravando");
+    $("btnGravar").setAttribute("aria-pressed", "true");
+    $("textoBotao").textContent = "Gravação em andamento";
+
+    mostrarTela($("tela2"));
+    criarWave();
+    animarWave(true);
+    iniciarTimer();
+    atualizarStatusGravacao();
+
+    state.recognition = obterReconhecimento();
+
+    if (!state.recognition) {
+      $("statusMic").textContent =
+        "Reconhecimento de voz não disponível neste navegador. Use Google Chrome ou Microsoft Edge.";
+      mostrarErro("Seu navegador não oferece reconhecimento de voz compatível.");
+      return;
+    }
+
+    try {
+      state.recognition.start();
+    } catch (error) {
+      mostrarErro("Não foi possível iniciar o reconhecimento de voz.");
+    }
+  }
+
+  function togglePausa() {
+    if (!state.gravando || !state.recognition) return;
+
+    if (!state.pausado) {
+      state.pausado = true;
+      state.restartRecognition = false;
+      try { state.recognition.stop(); } catch (_) {}
+      animarWave(false);
+      atualizarStatusGravacao();
+    } else {
+      state.pausado = false;
+      state.restartRecognition = true;
+      animarWave(true);
+      atualizarStatusGravacao();
+
+      try {
+        state.recognition.start();
+      } catch (_) {}
+    }
+  }
+
+  function pararGravacao(irParaResumo = true) {
+    state.gravando = false;
+    state.pausado = false;
+    state.restartRecognition = false;
+
+    pararTimer();
+    animarWave(false);
+
+    if (state.recognition) {
+      try { state.recognition.stop(); } catch (_) {}
+    }
+
+    $("btnGravar").classList.remove("gravando");
+    $("btnGravar").setAttribute("aria-pressed", "false");
+    $("textoBotao").textContent = "Toque para gravar";
+
+    if (irParaResumo) {
+      processarTexto((state.textoFinal + state.textoInterim).trim());
+      gerarResumoVisual();
+    }
+  }
+
+  function processarTexto(texto) {
+    if (!texto) return;
+
+    const limpo = texto.replace(/\s+/g, " ").trim();
+
+    $("res-queixa").textContent =
+      limpo.length > 180 ? limpo.slice(0, 180) + "…" : limpo;
+
+    const historico = limpo.length > 500
+      ? limpo.slice(0, 500) + "…"
+      : limpo;
+
+    $("res-hist").textContent = "• " + historico;
+
+    const match = limpo.match(/\b(10|[0-9])\s*(?:\/|de)\s*10\b/i);
+    if (match) {
+      const valor = Math.min(10, parseInt(match[1], 10));
+      const classificacao =
+        valor <= 3 ? "Leve" :
+        valor <= 6 ? "Moderada" : "Intensa";
+
+      $("res-dor").textContent = `${valor}/10 — Dor ${classificacao.toLowerCase()}`;
+      $("barraDor").style.width = `${valor * 10}%`;
+    }
+  }
+
+  function gerarResumoVisual() {
+    mostrarTela($("tela3"));
+
+    const texto = (state.textoFinal + state.textoInterim).trim();
+
+    if (!texto) {
+      $("res-queixa").textContent =
+        "Nenhuma informação foi transcrita durante a anamnese.";
+      $("res-hist").textContent =
+        "O resumo precisa ser conferido e preenchido pelo profissional.";
+      $("res-dor").textContent = "Não informada";
+      $("barraDor").style.width = "0%";
+    }
+  }
+
+  function salvar() {
+    const dados = {
+      queixa: $("res-queixa").textContent,
+      historico: $("res-hist").textContent,
+      escalaDor: $("res-dor").textContent,
+      transcricao: (state.textoFinal + state.textoInterim).trim(),
+      data: new Date().toISOString()
+    };
+
+    try {
+      localStorage.setItem("fisioVoice_prontuario", JSON.stringify(dados));
+      mostrarSucesso("Anamnese salva neste dispositivo.");
+    } catch (error) {
+      alert("Não foi possível salvar os dados neste navegador.");
+    }
+  }
+
+  function novaAnamnese() {
+    pararGravacao(false);
+
+    state.textoFinal = "";
+    state.textoInterim = "";
+    state.segundos = 0;
+
+    $("timer").textContent = "00:00";
+    $("transcricao").textContent = "Aguardando fala...";
+    $("res-queixa").textContent = "Aguardando informações da anamnese.";
+    $("res-hist").textContent = "Nenhum histórico transcrito.";
+    $("res-dor").textContent = "Não informada";
+    $("barraDor").style.width = "0%";
+
+    limparMensagens();
+    mostrarTela($("tela1"));
+  }
+
+  function atualizarHora() {
+    const agora = new Date();
+    $("horaStatus").textContent =
+      agora.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2
