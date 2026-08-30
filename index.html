@@ -1,1388 +1,584 @@
-```javascript
-/* =====================================================
-   FISIOIA — PRONTUÁRIO INTELIGENTE
-   JavaScript principal
-===================================================== */
-
-/* =========================
-   BANCO LOCAL
-========================= */
-
-let patients = JSON.parse(
-  localStorage.getItem("fisioia_patients")
-) || [];
-
-let anamneses = JSON.parse(
-  localStorage.getItem("fisioia_anamneses")
-) || [];
-
-let evolutions = JSON.parse(
-  localStorage.getItem("fisioia_evolutions")
-) || [];
-
-let aiRecords = JSON.parse(
-  localStorage.getItem("fisioia_ai_records")
-) || [];
-
-
-/* =========================
-   VARIÁVEIS
-========================= */
-
-let recognition = null;
-let currentAnamnesis = null;
-let currentEvolution = null;
-
-
-/* =========================
-   INICIALIZAÇÃO
-========================= */
-
-document.addEventListener("DOMContentLoaded", () => {
-
-  document.querySelectorAll(".nav-btn").forEach(button => {
-
-    button.addEventListener("click", () => {
-      showPage(button.dataset.page);
-    });
-
-  });
-
-  updateDashboard();
-  renderPatients();
-  populatePatientSelects();
-
-});
-
-
-/* =========================
-   NAVEGAÇÃO
-========================= */
-
-function showPage(page) {
-
-  const targetPage = document.getElementById(page);
-
-  if (!targetPage) return;
-
-  document.querySelectorAll(".page").forEach(section => {
-    section.classList.remove("active");
-  });
-
-  targetPage.classList.add("active");
-
-  document.querySelectorAll(".nav-btn").forEach(button => {
-
-    button.classList.toggle(
-      "active",
-      button.dataset.page === page
-    );
-
-  });
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-
-}
-
-
-/* =========================
-   MODAL PACIENTE
-========================= */
-
-function openPatientModal() {
-
-  document
-    .getElementById("patientModal")
-    .classList.add("open");
-
-  setTimeout(() => {
-    document
-      .getElementById("newPatientName")
-      .focus();
-  }, 100);
-
-}
-
-
-function closePatientModal() {
-
-  document
-    .getElementById("patientModal")
-    .classList.remove("open");
-
-}
-
-
-/* Fecha o modal clicando fora */
-
-document.addEventListener("click", event => {
-
-  const modal = document.getElementById("patientModal");
-
-  if (
-    modal &&
-    event.target === modal
-  ) {
-    closePatientModal();
-  }
-
-});
-
-
-/* =========================
-   CRIAR PACIENTE
-========================= */
-
-function createPatient() {
-
-  const name = document
-    .getElementById("newPatientName")
-    .value
-    .trim();
-
-  const birth = document
-    .getElementById("newPatientBirth")
-    .value;
-
-  const phone = document
-    .getElementById("newPatientPhone")
-    .value
-    .trim();
-
-  const complaint = document
-    .getElementById("newPatientComplaint")
-    .value
-    .trim();
-
-
-  if (!name) {
-
-    showNotification(
-      "Informe o nome do paciente.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  const patient = {
-
-    id: Date.now(),
-
-    name,
-
-    birth,
-
-    phone,
-
-    complaint,
-
-    createdAt: new Date().toISOString()
-
-  };
-
-
-  patients.unshift(patient);
-
-  saveData();
-
-  clearPatientForm();
-
-  closePatientModal();
-
-  updateDashboard();
-
-  renderPatients();
-
-  populatePatientSelects();
-
-  showNotification(
-    "Paciente cadastrado com sucesso!",
-    "success"
-  );
-
-}
-
-
-/* =========================
-   LIMPAR FORMULÁRIO
-========================= */
-
-function clearPatientForm() {
-
-  document.getElementById("newPatientName").value = "";
-
-  document.getElementById("newPatientBirth").value = "";
-
-  document.getElementById("newPatientPhone").value = "";
-
-  document.getElementById("newPatientComplaint").value = "";
-
-}
-
-
-/* =========================
-   LISTA DE PACIENTES
-========================= */
-
-function renderPatients() {
-
-  const container =
-    document.getElementById("patientsList");
-
-  if (!container) return;
-
-
-  const search =
-    document
-      .getElementById("patientSearch")
-      ?.value
-      .trim()
-      .toLowerCase() || "";
-
-
-  const filtered = patients.filter(patient =>
-    patient.name
-      .toLowerCase()
-      .includes(search)
-  );
-
-
-  if (!filtered.length) {
-
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">♙</div>
-        <h3>Nenhum paciente encontrado</h3>
-        <p>
-          ${
-            search
-              ? "Tente pesquisar por outro nome."
-              : "Cadastre seu primeiro paciente para começar."
-          }
-        </p>
-      </div>
-    `;
-
-    return;
-  }
-
-
-  container.innerHTML = filtered
-    .map(patient => {
-
-      const birth = formatDate(patient.birth);
-
-      return `
-
-        <div class="patient-row">
-
-          <div class="patient-info">
-
-            <div class="patient-avatar">
-              ${getInitials(patient.name)}
+from pathlib import Path
+import zipfile, textwrap
+
+base = Path("/mnt/data/FisioIA")
+base.mkdir(exist_ok=True)
+
+html = r'''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1264c7">
+  <title>FisioIA — Anamnese por Voz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="phone">
+      <header class="status-bar">
+        <span id="clock">09:41</span>
+        <div class="status-icons"><span>▮▮▮</span><span>⌁</span><span>87%</span></div>
+      </header>
+
+      <main id="app">
+        <!-- TELA INICIAL -->
+        <section class="screen active" id="homeScreen">
+          <div class="home-top">
+            <div class="brand-mark" aria-label="FisioIA">
+              <span>F</span>
             </div>
-
-            <div>
-
-              <div class="patient-name">
-                ${escapeHTML(patient.name)}
-              </div>
-
-              <div class="patient-sub">
-
-                ${birth !== "Não informado"
-                  ? `Nascimento: ${birth}`
-                  : "Nascimento não informado"}
-
-                ${
-                  patient.complaint
-                    ? ` • ${escapeHTML(patient.complaint)}`
-                    : ""
-                }
-
-              </div>
-
-            </div>
-
+            <button class="icon-button" title="Perfil" aria-label="Perfil">●</button>
           </div>
 
-          <button
-            class="text-btn"
-            onclick="selectPatient(${patient.id})"
-          >
-            Abrir →
+          <div class="welcome-card">
+            <div>
+              <p class="hello">Olá, Dra. Ana</p>
+              <h1>Pronta para iniciar a anamnese de hoje?</h1>
+            </div>
+            <div class="profile-circle">♙</div>
+          </div>
+
+          <div class="intro">
+            <h2>Anamnese Fisioterapêutica por Voz</h2>
+            <p>Mini app de apoio à entrevista clínica — com resumo e sugestões.</p>
+          </div>
+
+          <button class="mic-main" id="startHomeRecording" aria-label="Iniciar gravação">
+            <span>🎙</span>
+          </button>
+          <h3 class="tap-title">Toque para gravar</h3>
+          <p class="tap-subtitle">Fale sintomas, queixas e histórico.<br>A IA organiza, resume e sugere próximos passos.</p>
+
+          <div class="section-title">✦ Ferramentas de Apoio</div>
+
+          <button class="tool-card" id="organizeBtn">
+            <span class="tool-icon blue">☷</span>
+            <span><strong>Organizar entrevista</strong><small>Estrutura a entrevista por etapas da anamnese fisioterapêutica</small></span>
+            <b>›</b>
           </button>
 
-        </div>
+          <button class="tool-card" id="suggestBtn">
+            <span class="tool-icon purple">💡</span>
+            <span><strong>Sugerir próximos passos</strong><small>Sugere testes e avaliações físicas recomendadas para o caso</small></span>
+            <b>›</b>
+          </button>
 
-      `;
+          <div class="notice">
+            <span>ⓘ</span>
+            <div><strong>Apoio à decisão, não substitui o julgamento clínico</strong><small>O conteúdo deve ser revisado pelo profissional antes de qualquer decisão.</small></div>
+          </div>
+        </section>
 
-    })
-    .join("");
-
-}
-
-
-/* =========================
-   SELECIONAR PACIENTE
-========================= */
-
-function selectPatient(id) {
-
-  const patient =
-    patients.find(p => p.id === id);
-
-  if (!patient) return;
-
-
-  const anamnesisSelect =
-    document.getElementById("anamnesisPatient");
-
-  const evolutionSelect =
-    document.getElementById("evolutionPatient");
-
-
-  if (anamnesisSelect) {
-    anamnesisSelect.value = patient.id;
-  }
-
-  if (evolutionSelect) {
-    evolutionSelect.value = patient.id;
-  }
-
-
-  showPage("anamnesis");
-
-}
-
-
-/* =========================
-   DASHBOARD
-========================= */
-
-function updateDashboard() {
-
-  const patientCount =
-    document.getElementById("patientCount");
-
-  const sessionCount =
-    document.getElementById("sessionCount");
-
-  const aiCount =
-    document.getElementById("aiCount");
-
-
-  if (patientCount) {
-    patientCount.textContent = patients.length;
-  }
-
-  if (sessionCount) {
-    sessionCount.textContent = evolutions.length;
-  }
-
-  if (aiCount) {
-    aiCount.textContent = aiRecords.length;
-  }
-
-
-  const recent =
-    document.getElementById("recentPatients");
-
-  if (!recent) return;
-
-
-  if (!patients.length) {
-
-    recent.innerHTML = `
-
-      <div class="empty-state">
-
-        <div class="empty-icon">♙</div>
-
-        <h3>Nenhum paciente cadastrado</h3>
-
-        <p>
-          Cadastre seu primeiro paciente
-          para começar.
-        </p>
-
-      </div>
-
-    `;
-
-    return;
-  }
-
-
-  recent.innerHTML =
-    patients
-      .slice(0, 5)
-      .map(patient => `
-
-        <div class="patient-row">
-
-          <div class="patient-info">
-
-            <div class="patient-avatar">
-              ${getInitials(patient.name)}
-            </div>
-
-            <div>
-
-              <div class="patient-name">
-                ${escapeHTML(patient.name)}
-              </div>
-
-              <div class="patient-sub">
-
-                ${
-                  escapeHTML(
-                    patient.complaint ||
-                    "Paciente cadastrado"
-                  )
-                }
-
-              </div>
-
-            </div>
-
+        <!-- GRAVAÇÃO -->
+        <section class="screen" id="recordScreen">
+          <div class="screen-header">
+            <button class="back-button" id="backHome">‹</button>
+            <div class="brand-word"><span>✣</span> FisioIA</div>
+            <button class="more-button">•••</button>
           </div>
 
-        </div>
+          <div class="record-heading">
+            <h2>Gravação Ativa por Voz</h2>
+            <span class="recording-badge" id="recordBadge">● GRAVANDO</span>
+          </div>
 
-      `)
-      .join("");
+          <div class="wave" id="wave">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
 
+          <div class="timer" id="timer">00:00</div>
+          <div class="timer-label">Tempo de gravação</div>
+
+          <div class="transcript-card">
+            <div class="transcript-title">🎙 <strong>Transcrição em tempo real — Anamnese Fisioterapêutica</strong></div>
+            <label>👤 Paciente:</label>
+            <textarea id="transcript" placeholder="A transcrição aparecerá aqui enquanto você fala..."></textarea>
+            <em id="listeningStatus">Captando áudio...</em>
+          </div>
+
+          <div class="record-actions">
+            <button class="secondary-btn" id="pauseBtn">Ⅱ Pausar</button>
+            <button class="primary-blue" id="stopBtn">□ Parar</button>
+          </div>
+
+          <p class="auto-save">A gravação será salva automaticamente na ficha do paciente.</p>
+        </section>
+
+        <!-- RESUMO -->
+        <section class="screen" id="summaryScreen">
+          <div class="summary-header">
+            <button class="back-button light" id="backRecord">‹</button>
+            <strong>Resumo - IA</strong>
+            <button class="more-button light">•••</button>
+          </div>
+
+          <div class="summary-content">
+            <div class="summary-brand"><span>F</span></div>
+            <div class="ai-generated">✦ Resumo gerado por IA • agora</div>
+
+            <article class="summary-box highlighted">
+              <div class="box-icon">🧠</div>
+              <div><strong>Resumo gerado por IA</strong><p>Baseado na anamnese por voz realizada há poucos instantes.</p></div>
+            </article>
+
+            <article class="summary-box">
+              <div class="box-icon">💬</div>
+              <div><strong>Queixa principal</strong><p id="summaryComplaint">Dor lombar irradiando para a perna esquerda há 5 dias.</p></div>
+            </article>
+
+            <article class="summary-box">
+              <div class="box-icon">▣</div>
+              <div><strong>Histórico</strong><p id="summaryHistory">Paciente adulto. Relato organizado a partir da entrevista. Sem outros dados informados.</p></div>
+            </article>
+
+            <article class="summary-box">
+              <div class="box-icon">▤</div>
+              <div><strong>Escala de dor</strong><p><b id="painValue">6/10</b> — moderada</p><div class="pain-scale"><span></span></div><small>0 Sem dor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 10 Pior dor possível</small></div>
+            </article>
+
+            <article class="summary-box">
+              <div class="box-icon">↕</div>
+              <div class="factors">
+                <strong>Fatores de melhora e piora</strong>
+                <div class="factor-grid">
+                  <div><b>● Melhora:</b><p>Repouso e troca de posição</p></div>
+                  <div><b>! Piora:</b><p>Permanece sentado por muito tempo</p></div>
+                </div>
+              </div>
+            </article>
+
+            <div class="decision-note">ⓘ Apoio à decisão, não substitui o julgamento clínico.</div>
+
+            <div class="summary-actions">
+              <button class="outline-btn" id="saveBtn">Salvar no prontuário</button>
+              <button class="primary-blue" id="evaluationBtn">Iniciar avaliação</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- PACIENTES -->
+        <section class="screen" id="patientsScreen">
+          <div class="simple-header">
+            <div><span class="eyebrow">PRONTUÁRIO</span><h2>Pacientes</h2></div>
+            <button class="small-add" id="addPatientBtn">+ Novo</button>
+          </div>
+          <input class="search" id="patientSearch" placeholder="🔎  Buscar paciente...">
+          <div id="patientList" class="patient-list"></div>
+        </section>
+
+        <!-- HISTÓRICO -->
+        <section class="screen" id="historyScreen">
+          <div class="simple-header">
+            <div><span class="eyebrow">REGISTROS</span><h2>Histórico</h2></div>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+
+        <!-- AJUSTES -->
+        <section class="screen" id="settingsScreen">
+          <div class="simple-header">
+            <div><span class="eyebrow">SISTEMA</span><h2>Ajustes</h2></div>
+          </div>
+          <div class="settings-card">
+            <div><span>🎙</span><div><strong>Reconhecimento de voz</strong><small>Usar microfone do navegador</small></div><label class="switch"><input type="checkbox" id="voiceSetting" checked><span></span></label></div>
+            <div><span>✦</span><div><strong>Modo de demonstração</strong><small>IA local para apresentação acadêmica</small></div><label class="switch"><input type="checkbox" id="demoSetting" checked><span></span></label></div>
+            <div><span>🗑</span><div><strong>Limpar dados</strong><small>Apaga pacientes e registros deste navegador</small></div><button class="danger-link" id="clearDataBtn">Limpar</button></div>
+          </div>
+          <div class="notice"><span>ⓘ</span><div><strong>Privacidade</strong><small>Os dados desta versão ficam armazenados apenas no navegador usando armazenamento local.</small></div></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav">
+        <button class="nav-item active" data-screen="homeScreen"><span>⌂</span><small>Início</small></button>
+        <button class="nav-item" data-screen="patientsScreen"><span>♙</span><small>Pacientes</small></button>
+        <button class="nav-item" data-screen="historyScreen"><span>◷</span><small>Histórico</small></button>
+        <button class="nav-item" data-screen="settingsScreen"><span>⚙</span><small>Ajustes</small></button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="modal" id="patientModal">
+    <div class="modal-box">
+      <button class="modal-close" id="closeModal">×</button>
+      <h2>Novo paciente</h2>
+      <p>Cadastre os dados básicos para iniciar uma ficha.</p>
+      <label>Nome completo<input id="patientName" placeholder="Nome do paciente"></label>
+      <label>Queixa principal<textarea id="patientComplaint" placeholder="Queixa principal..."></textarea></label>
+      <button class="primary-blue wide" id="savePatient">Cadastrar paciente</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
+'''
+
+css = r''':root{
+  --blue:#1264c7;
+  --blue-dark:#0b4fa8;
+  --blue-light:#eaf3ff;
+  --navy:#09265d;
+  --text:#14284f;
+  --muted:#687895;
+  --line:#dbe4ef;
+  --bg:#f1f6fc;
+  --green:#27a96b;
+  --orange:#e69a16;
+  --purple:#7058d8;
+  --shadow:0 18px 45px rgba(22,61,112,.13);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(circle at 15% 10%,#dcecff 0,transparent 28%),
+    radial-gradient(circle at 90% 80%,#dcecff 0,transparent 30%),
+    var(--bg);
+  color:var(--text);
+}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+.app-shell{min-height:100vh;display:grid;place-items:center;padding:28px}
+.phone{
+  width:min(100%,430px);
+  min-height:820px;
+  max-height:94vh;
+  overflow:hidden;
+  position:relative;
+  background:#fff;
+  border:10px solid #162335;
+  border-radius:44px;
+  box-shadow:var(--shadow),0 0 0 2px #8793a2;
+}
+.status-bar{
+  height:35px;padding:8px 20px 0;display:flex;justify-content:space-between;
+  font-size:12px;font-weight:700;background:#fff;position:relative;z-index:5
+}
+.status-icons{display:flex;gap:8px;align-items:center}
+#app{height:calc(100% - 95px);min-height:680px;overflow-y:auto;scrollbar-width:none}
+#app::-webkit-scrollbar{display:none}
+.screen{display:none;padding:16px 18px 105px;animation:fade .22s ease}
+.screen.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.home-top,.screen-header,.summary-header{display:flex;align-items:center;justify-content:space-between}
+.home-top{padding:2px 5px 14px}
+.brand-mark,.summary-brand{
+  width:55px;height:55px;border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(145deg,#0c58b7,#55a0ef);color:#fff;font-size:29px;font-weight:900;
+  box-shadow:0 7px 16px rgba(18,100,199,.2)
+}
+.icon-button,.more-button,.back-button{
+  border:0;background:transparent;color:var(--blue);font-size:25px
+}
+.icon-button{width:44px;height:44px;border-radius:50%;background:#e8f2ff}
+.welcome-card{
+  background:linear-gradient(135deg,#dbeaff,#b9d7fa);
+  border-radius:15px;padding:15px 14px;display:flex;justify-content:space-between;align-items:center;
+  box-shadow:0 8px 20px rgba(18,100,199,.08)
+}
+.hello{font-weight:800;margin:0 0 4px;font-size:15px}.welcome-card h1{font-size:14px;line-height:1.35;margin:0;max-width:285px}
+.profile-circle{width:48px;height:48px;border:3px solid #fff;border-radius:50%;display:grid;place-items:center;background:#2b70c9;color:#fff;font-size:23px}
+.intro{text-align:center;padding:14px 8px 3px}.intro h2{font-size:17px;margin:0 0 5px}.intro p,.tap-subtitle{font-size:11px;color:var(--muted);line-height:1.5;margin:0}
+.mic-main{
+  display:grid;place-items:center;margin:18px auto 7px;width:82px;height:82px;border:7px solid #d9e9ff;
+  border-radius:50%;background:linear-gradient(145deg,#1264c7,#3688e5);color:#fff;font-size:34px;
+  box-shadow:0 10px 25px rgba(18,100,199,.25)
+}
+.mic-main:hover{transform:scale(1.04)}
+.tap-title{text-align:center;font-size:15px;margin:0 0 3px}.tap-subtitle{text-align:center}
+.section-title{font-size:12px;font-weight:800;margin:17px 0 8px;color:#344c76}
+.tool-card{
+  width:100%;border:1px solid #d7e0eb;background:#fff;border-radius:10px;margin:6px 0;padding:8px;
+  display:grid;grid-template-columns:42px 1fr 15px;gap:9px;align-items:center;text-align:left;color:var(--text)
+}
+.tool-card:hover{border-color:#9ec5ef;background:#fbfdff}.tool-card strong{display:block;font-size:12px}.tool-card small{display:block;color:var(--muted);font-size:9px;line-height:1.3;margin-top:2px}.tool-card b{font-size:22px;color:#6f819f}
+.tool-icon{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-size:20px}.tool-icon.blue{background:#e6f1ff;color:var(--blue)}.tool-icon.purple{background:#eeeaff;color:var(--purple)}
+.notice{display:flex;gap:9px;align-items:flex-start;background:#eef5ff;border-radius:9px;padding:9px 10px;margin-top:9px;font-size:10px;color:#365078}.notice>span{font-size:15px}.notice strong{display:block;font-size:10px}.notice small{display:block;line-height:1.35;margin-top:2px}
+.screen-header{padding:2px 2px 20px}.brand-word{font-size:19px;font-weight:800;color:var(--blue)}.brand-word span{font-size:23px}.record-heading{text-align:center}.record-heading h2{font-size:17px;margin:0 0 5px}.recording-badge{display:inline-block;background:#1765c7;color:#fff;border-radius:12px;padding:3px 10px;font-size:10px;font-weight:800}
+.wave{height:92px;display:flex;align-items:center;justify-content:center;gap:3px;margin:18px 0}.wave i{display:block;width:4px;height:var(--h,35px);background:linear-gradient(#0a4da5,#378ce8);border-radius:8px;animation:wave 1s ease-in-out infinite alternate}.wave i:nth-child(1){--h:18px}.wave i:nth-child(2){--h:38px}.wave i:nth-child(3){--h:60px}.wave i:nth-child(4){--h:28px}.wave i:nth-child(5){--h:72px}.wave i:nth-child(6){--h:45px}.wave i:nth-child(7){--h:82px}.wave i:nth-child(8){--h:50px}.wave i:nth-child(9){--h:67px}.wave i:nth-child(10){--h:30px}.wave i:nth-child(11){--h:75px}.wave i:nth-child(12){--h:44px}.wave i:nth-child(13){--h:85px}.wave i:nth-child(14){--h:37px}.wave i:nth-child(15){--h:65px}.wave i:nth-child(16){--h:45px}.wave i:nth-child(17){--h:78px}.wave i:nth-child(18){--h:33px}.wave i:nth-child(19){--h:60px}.wave i:nth-child(20){--h:27px}.wave i:nth-child(21){--h:70px}.wave i:nth-child(22){--h:42px}.wave i:nth-child(23){--h:62px}.wave i:nth-child(24){--h:32px}.wave i:nth-child(25){--h:55px}.wave i:nth-child(26){--h:25px}.wave i:nth-child(27){--h:48px}.wave i:nth-child(28){--h:22px}.wave i:nth-child(29){--h:39px}.wave i:nth-child(30){--h:17px}
+@keyframes wave{to{transform:scaleY(.45)}}
+.timer{text-align:center;font-size:41px;font-weight:900;color:#073a91;letter-spacing:-1px}.timer-label{text-align:center;font-size:11px;color:var(--muted)}
+.transcript-card{background:#dceaff;border-radius:11px;padding:12px;margin-top:15px}.transcript-title{font-size:11px;line-height:1.3;color:#123e82;margin-bottom:10px}.transcript-card label{font-size:11px;color:#365078;font-weight:800}.transcript-card textarea{width:100%;height:135px;border:0;outline:0;resize:none;background:transparent;color:#1c2d49;font-size:11px;line-height:1.4;padding:6px 0}.transcript-card em{font-size:10px;color:#7285a2}
+.record-actions,.summary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:15px}.primary-blue,.secondary-btn,.outline-btn{border:0;border-radius:9px;padding:12px;font-weight:800}.primary-blue{background:linear-gradient(135deg,#1264c7,#0a57b4);color:#fff}.secondary-btn{background:#fff;border:2px solid #4777b5;color:#1264c7}.auto-save{text-align:center;font-size:9px;color:#667a97}
+.summary-header{background:#1264c7;color:#fff;margin:-16px -18px 0;padding:12px 13px}.summary-header .light{color:#fff}.summary-header strong{font-size:13px}.summary-content{padding-top:13px}.summary-brand{width:70px;height:55px;margin:auto;font-size:28px}.ai-generated{width:max-content;max-width:100%;margin:9px auto;background:#1765c7;color:#fff;border-radius:13px;padding:4px 10px;font-size:9px;font-weight:800}
+.summary-box{display:grid;grid-template-columns:28px 1fr;gap:8px;border:1px solid #c9d4e2;border-radius:8px;padding:9px;margin:7px 0;background:#fff}.summary-box.highlighted{background:#dbeaff;border:0}.box-icon{font-size:16px}.summary-box strong{font-size:12px}.summary-box p{font-size:10px;line-height:1.4;margin:2px 0;color:#263c60}.summary-box small{font-size:8px;color:#667895}.pain-scale{height:7px;border-radius:10px;background:linear-gradient(90deg,#35b879,#e9bd45,#dc4a42);margin:6px 0}
+.factor-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px}.factor-grid b{font-size:10px}.factor-grid div:first-child b{color:var(--green)}.factor-grid div:last-child b{color:var(--orange)}.factor-grid p{font-size:9px}
+.decision-note{background:#fff1c8;color:#745a12;padding:6px;border-radius:6px;text-align:center;font-size:9px;margin-top:8px}.outline-btn{background:#fff;border:1px solid #1264c7;color:#1264c7}.summary-actions .primary-blue{font-size:11px}.wide{width:100%;margin-top:15px}
+.simple-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.eyebrow{font-size:9px;color:var(--blue);font-weight:900;letter-spacing:1.4px}.simple-header h2{font-size:23px;margin:3px 0}.small-add{border:0;border-radius:8px;padding:9px 12px;background:var(--blue);color:#fff;font-weight:800}.search{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;outline:none;margin-bottom:10px}.patient-list,.history-list{display:grid;gap:8px}.patient-item,.history-item,.settings-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px}.patient-item{display:flex;align-items:center;gap:10px}.patient-avatar{width:39px;height:39px;border-radius:50%;background:#e5f1ff;color:var(--blue);display:grid;place-items:center;font-weight:900}.patient-item strong,.history-item strong{font-size:12px}.patient-item small,.history-item small{display:block;color:var(--muted);font-size:9px;margin-top:3px}.history-item{border-left:4px solid var(--blue)}.settings-card>div{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.settings-card>div:last-child{border:0}.settings-card>div>span{font-size:19px}.settings-card strong{display:block;font-size:11px}.settings-card small{display:block;color:var(--muted);font-size:9px;margin-top:3px}.settings-card>div>div{flex:1}.switch input{display:none}.switch span{display:block;width:39px;height:22px;border-radius:20px;background:#c8d1dc;position:relative}.switch span:after{content:"";position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.2s}.switch input:checked+span{background:var(--blue)}.switch input:checked+span:after{transform:translateX(17px)}.danger-link{border:0;background:#fff0f0;color:#c33;border-radius:7px;padding:7px;font-weight:800;font-size:10px}
+.bottom-nav{position:absolute;left:0;right:0;bottom:0;height:68px;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid #e3e9f0;display:grid;grid-template-columns:repeat(4,1fr);z-index:10;padding-bottom:4px}.nav-item{border:0;background:transparent;color:#7b879b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.nav-item span{font-size:20px}.nav-item small{font-size:9px}.nav-item.active{color:var(--blue);font-weight:900}
+.modal{position:fixed;inset:0;background:rgba(8,25,55,.48);display:none;align-items:center;justify-content:center;padding:20px;z-index:30}.modal.open{display:flex}.modal-box{width:min(100%,390px);background:#fff;border-radius:18px;padding:22px;position:relative;box-shadow:0 25px 70px rgba(0,0,0,.2)}.modal-box h2{margin:0;font-size:20px}.modal-box>p{font-size:11px;color:var(--muted)}.modal-box label{display:block;font-size:11px;font-weight:800;margin:13px 0}.modal-box input,.modal-box textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px;margin-top:6px;outline:none}.modal-box textarea{min-height:85px;resize:vertical}.modal-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:25px;color:#7d8aa0}
+.toast{position:fixed;left:50%;bottom:30px;transform:translate(-50%,20px);background:#14284f;color:#fff;padding:10px 15px;border-radius:10px;font-size:11px;opacity:0;pointer-events:none;transition:.25s;z-index:50}.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:480px){body{background:#fff}.app-shell{padding:0}.phone{width:100%;height:100vh;max-height:none;border:0;border-radius:0;box-shadow:none}.status-bar{height:34px}.bottom-nav{position:fixed;max-width:430px;left:50%;transform:translateX(-50%);right:auto;width:100%}}
+'''
+js = r'''const STORAGE = {
+  patients: "fisioia_demo_patients",
+  records: "fisioia_demo_records"
+};
+
+let patients = JSON.parse(localStorage.getItem(STORAGE.patients) || "[]");
+let records = JSON.parse(localStorage.getItem(STORAGE.records) || "[]");
+let recognition = null;
+let recording = false;
+let paused = false;
+let seconds = 0;
+let timerId = null;
+
+const $ = id => document.getElementById(id);
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateClock();
+  setInterval(updateClock, 30000);
+  bindNavigation();
+  bindActions();
+  renderPatients();
+  renderHistory();
+});
+
+function updateClock() {
+  const now = new Date();
+  $("clock").textContent = now.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
 }
 
-
-/* =========================
-   SELECTS
-========================= */
-
-function populatePatientSelects() {
-
-  const selects = [
-
-    document.getElementById(
-      "anamnesisPatient"
-    ),
-
-    document.getElementById(
-      "evolutionPatient"
-    )
-
-  ];
-
-
-  selects.forEach(select => {
-
-    if (!select) return;
-
-
-    const currentValue =
-      select.value;
-
-
-    select.innerHTML = `
-      <option value="">
-        Selecione o paciente
-      </option>
-    `;
-
-
-    patients.forEach(patient => {
-
-      const option =
-        document.createElement("option");
-
-      option.value = patient.id;
-
-      option.textContent =
-        patient.name;
-
-      select.appendChild(option);
-
-    });
-
-
-    select.value = currentValue;
-
+function bindNavigation() {
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.addEventListener("click", () => showScreen(btn.dataset.screen));
   });
-
 }
 
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  const target = $(id);
+  if (target) target.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.screen === id));
+  $("app").scrollTop = 0;
+}
 
-/* =========================
-   RECONHECIMENTO DE VOZ
-========================= */
+function bindActions() {
+  $("startHomeRecording").addEventListener("click", startRecording);
+  $("backHome").addEventListener("click", () => { stopRecording(false); showScreen("homeScreen"); });
+  $("backRecord").addEventListener("click", () => showScreen("recordScreen"));
+  $("pauseBtn").addEventListener("click", togglePause);
+  $("stopBtn").addEventListener("click", finishRecording);
+  $("saveBtn").addEventListener("click", saveCurrentRecord);
+  $("evaluationBtn").addEventListener("click", () => toast("Avaliação iniciada. Próxima etapa: exame físico."));
+  $("organizeBtn").addEventListener("click", () => { startRecording(); toast("Gravação iniciada para organizar a entrevista."); });
+  $("suggestBtn").addEventListener("click", () => toast("Sugestões serão baseadas no relato após a gravação."));
+  $("addPatientBtn").addEventListener("click", openModal);
+  $("closeModal").addEventListener("click", closeModal);
+  $("savePatient").addEventListener("click", createPatient);
+  $("patientSearch").addEventListener("input", renderPatients);
+  $("clearDataBtn").addEventListener("click", clearData);
+}
 
-function startVoiceRecognition() {
+function startRecording() {
+  showScreen("recordScreen");
+  recording = true;
+  paused = false;
+  seconds = 0;
+  $("transcript").value = "";
+  $("recordBadge").textContent = "● GRAVANDO";
+  $("pauseBtn").textContent = "Ⅱ Pausar";
+  startTimer();
+  startSpeechRecognition();
+}
 
-  const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
+function startTimer() {
+  clearInterval(timerId);
+  timerId = setInterval(() => {
+    if (recording && !paused) {
+      seconds++;
+      $("timer").textContent = formatTime(seconds);
+    }
+  }, 1000);
+}
 
+function formatTime(value) {
+  const m = String(Math.floor(value / 60)).padStart(2, "0");
+  const s = String(value % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
 
-  if (!SpeechRecognition) {
+function togglePause() {
+  if (!recording) return;
+  paused = !paused;
+  $("pauseBtn").textContent = paused ? "▶ Continuar" : "Ⅱ Pausar";
+  $("recordBadge").textContent = paused ? "Ⅱ PAUSADO" : "● GRAVANDO";
+  if (paused && recognition) recognition.stop();
+  else if (!paused) startSpeechRecognition();
+}
 
-    showNotification(
-      "Seu navegador não suporta reconhecimento de voz. Use Google Chrome ou Microsoft Edge.",
-      "error"
-    );
-
+function startSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("listeningStatus").textContent = "Reconhecimento de voz não disponível. Digite o relato manualmente.";
     return;
   }
+  if (recognition) return;
 
-
-  if (recognition) {
-
-    recognition.stop();
-
-    return;
-  }
-
-
-  const button =
-    document.getElementById("voiceButton");
-
-  const status =
-    document.getElementById("voiceStatus");
-
-  const textarea =
-    document.getElementById("voiceText");
-
-
-  recognition =
-    new SpeechRecognition();
-
+  recognition = new SR();
   recognition.lang = "pt-BR";
-
   recognition.continuous = true;
+  recognition.interimResults = true;
 
-  recognition.interimResults = false;
-
-
-  recognition.onstart = () => {
-
-    button?.classList.add("recording");
-
-    if (status) {
-      status.innerHTML =
-        "🔴 <strong>Gravando...</strong> fale normalmente.";
+  recognition.onstart = () => $("listeningStatus").textContent = "Captando áudio...";
+  recognition.onresult = e => {
+    let finalText = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript + " ";
     }
-
+    if (finalText) {
+      const area = $("transcript");
+      area.value = (area.value.trim() + " " + finalText).trim();
+    }
   };
-
-
-  recognition.onresult = event => {
-
-    let transcript = "";
-
-    for (
-      let i = event.resultIndex;
-      i < event.results.length;
-      i++
-    ) {
-
-      if (event.results[i].isFinal) {
-
-        transcript +=
-          event.results[i][0].transcript;
-
-      }
-
-    }
-
-
-    if (transcript) {
-
-      const current =
-        textarea.value.trim();
-
-      textarea.value =
-        current
-          ? current + " " + transcript
-          : transcript;
-
-    }
-
-  };
-
-
-  recognition.onerror = event => {
-
-    console.error(
-      "Erro de reconhecimento:",
-      event.error
-    );
-
-    if (status) {
-      status.textContent =
-        "Não foi possível reconhecer a fala.";
-    }
-
-  };
-
-
+  recognition.onerror = () => $("listeningStatus").textContent = "Microfone indisponível ou sem permissão. Você pode digitar.";
   recognition.onend = () => {
-
-    button?.classList.remove(
-      "recording"
-    );
-
-    if (status) {
-
-      status.textContent =
-        "Clique no microfone para continuar.";
-
-    }
-
     recognition = null;
-
+    if (recording && !paused) setTimeout(startSpeechRecognition, 200);
   };
+  try { recognition.start(); } catch (_) {}
+}
 
+function finishRecording() {
+  stopRecording(true);
+  generateSummary();
+  showScreen("summaryScreen");
+}
 
-  try {
-
-    recognition.start();
-
-  } catch (error) {
-
-    console.error(error);
-
+function stopRecording(reset) {
+  recording = false;
+  paused = false;
+  clearInterval(timerId);
+  if (recognition) {
+    recognition.onend = null;
+    recognition.stop();
     recognition = null;
-
   }
-
+  if (reset) {
+    $("recordBadge").textContent = "● GRAVANDO";
+  }
 }
 
-
-/* =========================
-   ANAMNESE + IA
-========================= */
-
-function processWithAI() {
-
-  const patientId =
-    document
-      .getElementById("anamnesisPatient")
-      .value;
-
-
-  const text =
-    document
-      .getElementById("voiceText")
-      .value
-      .trim();
-
-
-  if (!patientId) {
-
-    showNotification(
-      "Selecione um paciente.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  if (!text) {
-
-    showNotification(
-      "Digite ou grave o relato clínico.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  const patient =
-    patients.find(
-      p => p.id == patientId
-    );
-
-
-  if (!patient) return;
-
-
-  const result =
-    generateClinicalStructure(
-      patient,
-      text
-    );
-
-
-  document.getElementById(
-    "aiResult"
-  ).innerHTML = result;
-
-
-  document
-    .getElementById("saveAnamnesis")
-    .classList.remove("hidden");
-
-
-  currentAnamnesis = {
-
-    patientId:
-      Number(patientId),
-
-    originalText:
-      text,
-
-    result
-
+function generateSummary() {
+  const raw = $("transcript").value.trim();
+  const fallback = "Paciente relata dor lombar irradiando para a perna esquerda há 5 dias. Refere piora ao permanecer sentado e melhora com repouso e mudança de posição.";
+  const text = raw || fallback;
+  const pain = detectPain(text);
+  $("summaryComplaint").textContent = makeComplaint(text);
+  $("summaryHistory").textContent = text.length > 160 ? text.slice(0, 157) + "..." : text;
+  $("painValue").textContent = `${pain}/10`;
+  window.currentRecord = {
+    transcript: text,
+    complaint: makeComplaint(text),
+    pain,
+    createdAt: new Date().toISOString()
   };
-
-
-  showNotification(
-    "Anamnese organizada. Revise antes de salvar.",
-    "success"
-  );
-
 }
 
-
-/* =========================
-   ESTRUTURA CLÍNICA
-========================= */
-
-function generateClinicalStructure(
-  patient,
-  text
-) {
-
-  const complaint =
-    patient.complaint ||
-    "Não informado";
-
-
-  return `
-
-    <div class="clinical-section">
-
-      <h3>Identificação</h3>
-
-      <p>
-        <strong>Paciente:</strong>
-        ${escapeHTML(patient.name)}
-      </p>
-
-    </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Queixa principal</h3>
-
-      <p>
-        ${escapeHTML(complaint)}
-      </p>
-
-    </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Relato da anamnese</h3>
-
-      <p>
-        ${escapeHTML(text)}
-      </p>
-
-    </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Observações clínicas</h3>
-
-      <p>
-        Informações organizadas a partir
-        do relato informado. Revise todos
-        os dados antes de utilizar no
-        prontuário clínico.
-      </p>
-
-    </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Plano / próximos passos</h3>
-
-      <p>
-        Realizar avaliação fisioterapêutica,
-        estabelecer objetivos terapêuticos
-        e definir a conduta conforme os
-        achados clínicos.
-      </p>
-
-    </div>
-
-  `;
-
+function detectPain(text) {
+  const match = text.match(/(?:dor|escala)[^\d]{0,15}(\d{1,2})\s*(?:\/|de)\s*10/i);
+  if (match) return Math.min(10, Number(match[1]));
+  return 6;
 }
 
+function makeComplaint(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes("lomb")) return "Dor lombar, com características descritas no relato.";
+  if (lower.includes("joelho")) return "Dor no joelho, conforme relato do paciente.";
+  if (lower.includes("ombro")) return "Dor no ombro, conforme relato do paciente.";
+  if (lower.includes("cervic")) return "Dor cervical, conforme relato do paciente.";
+  return text.length > 95 ? text.slice(0, 92) + "..." : text;
+}
 
-/* =========================
-   SALVAR ANAMNESE
-========================= */
-
-function saveAnamnesis() {
-
-  if (!currentAnamnesis) return;
-
-
-  anamneses.push({
-
+function saveCurrentRecord() {
+  if (!window.currentRecord) generateSummary();
+  records.unshift({
     id: Date.now(),
-
-    ...currentAnamnesis,
-
-    createdAt:
-      new Date().toISOString()
-
+    type: "Anamnese por voz",
+    patient: patients[0]?.name || "Paciente não identificado",
+    ...window.currentRecord
   });
+  localStorage.setItem(STORAGE.records, JSON.stringify(records));
+  renderHistory();
+  toast("Anamnese salva no histórico.");
+}
 
+function openModal() { $("patientModal").classList.add("open"); $("patientName").focus(); }
+function closeModal() { $("patientModal").classList.remove("open"); }
 
-  aiRecords.push({
+function createPatient() {
+  const name = $("patientName").value.trim();
+  const complaint = $("patientComplaint").value.trim();
+  if (!name) return toast("Informe o nome do paciente.");
+  patients.unshift({id:Date.now(), name, complaint});
+  localStorage.setItem(STORAGE.patients, JSON.stringify(patients));
+  $("patientName").value = "";
+  $("patientComplaint").value = "";
+  closeModal();
+  renderPatients();
+  toast("Paciente cadastrado com sucesso.");
+}
 
-    id: Date.now(),
-
-    type: "anamnese",
-
-    createdAt:
-      new Date().toISOString()
-
-  });
-
-
-  saveData();
-
-
-  document.getElementById(
-    "voiceText"
-  ).value = "";
-
-
-  document.getElementById(
-    "aiResult"
-  ).innerHTML = `
-
-    <div class="empty-state">
-
-      <div class="empty-icon success">
-        ✓
-      </div>
-
-      <h3>Anamnese salva!</h3>
-
-      <p>
-        O registro foi armazenado
-        no prontuário local.
-      </p>
-
+function renderPatients() {
+  const q = $("patientSearch").value.toLowerCase().trim();
+  const filtered = patients.filter(p => p.name.toLowerCase().includes(q));
+  $("patientList").innerHTML = filtered.length ? filtered.map(p => `
+    <div class="patient-item">
+      <div class="patient-avatar">${initials(p.name)}</div>
+      <div><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.complaint || "Sem queixa registrada")}</small></div>
     </div>
-
-  `;
-
-
-  document
-    .getElementById("saveAnamnesis")
-    .classList.add("hidden");
-
-
-  currentAnamnesis = null;
-
-
-  updateDashboard();
-
-
-  showNotification(
-    "Anamnese salva com sucesso!",
-    "success"
-  );
-
+  `).join("") : `<div class="history-item"><strong>Nenhum paciente cadastrado</strong><small>Use “+ Novo” para criar uma ficha.</small></div>`;
 }
 
-
-/* =========================
-   VOZ — EVOLUÇÃO
-========================= */
-
-function startEvolutionVoice() {
-
-  const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
-
-
-  if (!SpeechRecognition) {
-
-    showNotification(
-      "Seu navegador não suporta reconhecimento de voz.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  const recognitionEvolution =
-    new SpeechRecognition();
-
-
-  recognitionEvolution.lang =
-    "pt-BR";
-
-  recognitionEvolution.continuous =
-    false;
-
-  recognitionEvolution.interimResults =
-    false;
-
-
-  recognitionEvolution.onstart = () => {
-
-    showNotification(
-      "Gravando evolução...",
-      "success"
-    );
-
-  };
-
-
-  recognitionEvolution.onresult =
-    event => {
-
-      const text =
-        event.results[0][0]
-          .transcript;
-
-
-      const textarea =
-        document.getElementById(
-          "evolutionText"
-        );
-
-
-      const current =
-        textarea.value.trim();
-
-
-      textarea.value =
-        current
-          ? current + " " + text
-          : text;
-
-    };
-
-
-  recognitionEvolution.onerror =
-    () => {
-
-      showNotification(
-        "Não foi possível reconhecer a fala.",
-        "error"
-      );
-
-    };
-
-
-  recognitionEvolution.start();
-
-}
-
-
-/* =========================
-   GERAR EVOLUÇÃO
-========================= */
-
-function generateEvolution() {
-
-  const patientId =
-    document
-      .getElementById("evolutionPatient")
-      .value;
-
-
-  const text =
-    document
-      .getElementById("evolutionText")
-      .value
-      .trim();
-
-
-  const conduct =
-    document
-      .getElementById("conduct")
-      .value
-      .trim();
-
-
-  if (!patientId) {
-
-    showNotification(
-      "Selecione um paciente.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  if (!text) {
-
-    showNotification(
-      "Informe o relato da sessão.",
-      "error"
-    );
-
-    return;
-  }
-
-
-  const patient =
-    patients.find(
-      p => p.id == patientId
-    );
-
-
-  if (!patient) return;
-
-
-  const result = `
-
-    <div class="clinical-section">
-
-      <h3>Paciente</h3>
-
-      <p>
-        ${escapeHTML(patient.name)}
-      </p>
-
+function renderHistory() {
+  $("historyList").innerHTML = records.length ? records.map(r => `
+    <div class="history-item">
+      <strong>${escapeHtml(r.type)}</strong>
+      <small>${escapeHtml(r.patient)} • ${new Date(r.createdAt).toLocaleString("pt-BR")}</small>
+      <small>${escapeHtml(r.complaint || "")}</small>
     </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Evolução</h3>
-
-      <p>
-        ${escapeHTML(text)}
-      </p>
-
-    </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Conduta realizada</h3>
-
-      <p>
-        ${
-          escapeHTML(
-            conduct ||
-            "Não informado"
-          )
-        }
-      </p>
-
-    </div>
-
-
-    <div class="clinical-section">
-
-      <h3>Plano</h3>
-
-      <p>
-        Manter acompanhamento
-        fisioterapêutico e reavaliar
-        a resposta clínica na
-        próxima sessão.
-      </p>
-
-    </div>
-
-  `;
-
-
-  const resultBox =
-    document.getElementById(
-      "evolutionResult"
-    );
-
-
-  resultBox.innerHTML = result;
-
-  resultBox.classList.remove(
-    "hidden"
-  );
-
-
-  document
-    .getElementById("saveEvolution")
-    .classList.remove("hidden");
-
-
-  currentEvolution = {
-
-    patientId:
-      Number(patientId),
-
-    originalText:
-      text,
-
-    conduct,
-
-    result
-
-  };
-
-
-  showNotification(
-    "Evolução estruturada. Revise antes de salvar.",
-    "success"
-  );
-
+  `).join("") : `<div class="history-item"><strong>Nenhum registro ainda.</strong><small>As anamneses salvas aparecerão aqui.</small></div>`;
 }
 
-
-/* =========================
-   SALVAR EVOLUÇÃO
-========================= */
-
-function saveEvolution() {
-
-  if (!currentEvolution) return;
-
-
-  evolutions.push({
-
-    id: Date.now(),
-
-    ...currentEvolution,
-
-    createdAt:
-      new Date().toISOString()
-
-  });
-
-
-  aiRecords.push({
-
-    id: Date.now(),
-
-    type: "evolucao",
-
-    createdAt:
-      new Date().toISOString()
-
-  });
-
-
-  saveData();
-
-
-  document.getElementById(
-    "evolutionText"
-  ).value = "";
-
-
-  document.getElementById(
-    "conduct"
-  ).value = "";
-
-
-  document
-    .getElementById("evolutionResult")
-    .classList.add("hidden");
-
-
-  document
-    .getElementById("saveEvolution")
-    .classList.add("hidden");
-
-
-  currentEvolution = null;
-
-
-  updateDashboard();
-
-
-  showNotification(
-    "Evolução salva com sucesso!",
-    "success"
-  );
-
+function initials(name) {
+  return name.split(/\s+/).slice(0,2).map(x => x[0]).join("").toUpperCase();
 }
-
-
-/* =========================
-   STORAGE
-========================= */
-
-function saveData() {
-
-  localStorage.setItem(
-    "fisioia_patients",
-    JSON.stringify(patients)
-  );
-
-  localStorage.setItem(
-    "fisioia_anamneses",
-    JSON.stringify(anamneses)
-  );
-
-  localStorage.setItem(
-    "fisioia_evolutions",
-    JSON.stringify(evolutions)
-  );
-
-  localStorage.setItem(
-    "fisioia_ai_records",
-    JSON.stringify(aiRecords)
-  );
-
+function escapeHtml(value) {
+  const d = document.createElement("div");
+  d.textContent = value || "";
+  return d.innerHTML;
 }
-
-
-/* =========================
-   UTILITÁRIOS
-========================= */
-
-function getInitials(name) {
-
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(word => word.charAt(0))
-    .join("")
-    .toUpperCase();
-
+function clearData() {
+  if (!confirm("Apagar todos os dados deste navegador?")) return;
+  patients = [];
+  records = [];
+  localStorage.removeItem(STORAGE.patients);
+  localStorage.removeItem(STORAGE.records);
+  renderPatients();
+  renderHistory();
+  toast("Dados apagados.");
 }
-
-
-function escapeHTML(text) {
-
-  const div =
-    document.createElement("div");
-
-  div.textContent =
-    text || "";
-
-  return div.innerHTML;
-
+function toast(message) {
+  const t = $("toast");
+  t.textContent = message;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 2600);
 }
+'''
+for name, content in [("index.html", html), ("style.css", css), ("app.js", js)]:
+    (base / name).write_text(content, encoding="utf-8")
 
+zip_path = Path("/mnt/data/FisioIA_site.zip")
+with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+    for f in base.iterdir():
+        z.write(f, arcname=f.name)
 
-function formatDate(date) {
-
-  if (!date) {
-    return "Não informado";
-  }
-
-
-  const parts =
-    date.split("-");
-
-
-  if (parts.length !== 3) {
-    return "Não informado";
-  }
-
-
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-
-}
-
-
-/* =========================
-   NOTIFICAÇÕES
-========================= */
-
-function showNotification(
-  message,
-  type = "success"
-) {
-
-  let notification =
-    document.getElementById(
-      "fisioNotification"
-    );
-
-
-  if (!notification) {
-
-    notification =
-      document.createElement("div");
-
-    notification.id =
-      "fisioNotification";
-
-    notification.className =
-      "notification";
-
-    document.body.appendChild(
-      notification
-    );
-
-  }
-
-
-  notification.className =
-    `notification ${type}`;
-
-
-  notification.innerHTML = `
-
-    <span>
-      ${
-        type === "success"
-          ? "✓"
-          : "!"
-      }
-    </span>
-
-    <p>
-      ${escapeHTML(message)}
-    </p>
-
-  `;
-
-
-  requestAnimationFrame(() => {
-
-    notification.classList.add(
-      "show"
-    );
-
-  });
-
-
-  clearTimeout(
-    notification.hideTimeout
-  );
-
-
-  notification.hideTimeout =
-    setTimeout(() => {
-
-      notification.classList.remove(
-        "show"
-      );
-
-    }, 3500);
-
-}
-```
+print(f"Arquivos criados em: {base}")
+print(f"ZIP: {zip_path}")
