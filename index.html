@@ -1,0 +1,1388 @@
+```javascript
+/* =====================================================
+   FISIOIA — PRONTUÁRIO INTELIGENTE
+   JavaScript principal
+===================================================== */
+
+/* =========================
+   BANCO LOCAL
+========================= */
+
+let patients = JSON.parse(
+  localStorage.getItem("fisioia_patients")
+) || [];
+
+let anamneses = JSON.parse(
+  localStorage.getItem("fisioia_anamneses")
+) || [];
+
+let evolutions = JSON.parse(
+  localStorage.getItem("fisioia_evolutions")
+) || [];
+
+let aiRecords = JSON.parse(
+  localStorage.getItem("fisioia_ai_records")
+) || [];
+
+
+/* =========================
+   VARIÁVEIS
+========================= */
+
+let recognition = null;
+let currentAnamnesis = null;
+let currentEvolution = null;
+
+
+/* =========================
+   INICIALIZAÇÃO
+========================= */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  document.querySelectorAll(".nav-btn").forEach(button => {
+
+    button.addEventListener("click", () => {
+      showPage(button.dataset.page);
+    });
+
+  });
+
+  updateDashboard();
+  renderPatients();
+  populatePatientSelects();
+
+});
+
+
+/* =========================
+   NAVEGAÇÃO
+========================= */
+
+function showPage(page) {
+
+  const targetPage = document.getElementById(page);
+
+  if (!targetPage) return;
+
+  document.querySelectorAll(".page").forEach(section => {
+    section.classList.remove("active");
+  });
+
+  targetPage.classList.add("active");
+
+  document.querySelectorAll(".nav-btn").forEach(button => {
+
+    button.classList.toggle(
+      "active",
+      button.dataset.page === page
+    );
+
+  });
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+
+}
+
+
+/* =========================
+   MODAL PACIENTE
+========================= */
+
+function openPatientModal() {
+
+  document
+    .getElementById("patientModal")
+    .classList.add("open");
+
+  setTimeout(() => {
+    document
+      .getElementById("newPatientName")
+      .focus();
+  }, 100);
+
+}
+
+
+function closePatientModal() {
+
+  document
+    .getElementById("patientModal")
+    .classList.remove("open");
+
+}
+
+
+/* Fecha o modal clicando fora */
+
+document.addEventListener("click", event => {
+
+  const modal = document.getElementById("patientModal");
+
+  if (
+    modal &&
+    event.target === modal
+  ) {
+    closePatientModal();
+  }
+
+});
+
+
+/* =========================
+   CRIAR PACIENTE
+========================= */
+
+function createPatient() {
+
+  const name = document
+    .getElementById("newPatientName")
+    .value
+    .trim();
+
+  const birth = document
+    .getElementById("newPatientBirth")
+    .value;
+
+  const phone = document
+    .getElementById("newPatientPhone")
+    .value
+    .trim();
+
+  const complaint = document
+    .getElementById("newPatientComplaint")
+    .value
+    .trim();
+
+
+  if (!name) {
+
+    showNotification(
+      "Informe o nome do paciente.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const patient = {
+
+    id: Date.now(),
+
+    name,
+
+    birth,
+
+    phone,
+
+    complaint,
+
+    createdAt: new Date().toISOString()
+
+  };
+
+
+  patients.unshift(patient);
+
+  saveData();
+
+  clearPatientForm();
+
+  closePatientModal();
+
+  updateDashboard();
+
+  renderPatients();
+
+  populatePatientSelects();
+
+  showNotification(
+    "Paciente cadastrado com sucesso!",
+    "success"
+  );
+
+}
+
+
+/* =========================
+   LIMPAR FORMULÁRIO
+========================= */
+
+function clearPatientForm() {
+
+  document.getElementById("newPatientName").value = "";
+
+  document.getElementById("newPatientBirth").value = "";
+
+  document.getElementById("newPatientPhone").value = "";
+
+  document.getElementById("newPatientComplaint").value = "";
+
+}
+
+
+/* =========================
+   LISTA DE PACIENTES
+========================= */
+
+function renderPatients() {
+
+  const container =
+    document.getElementById("patientsList");
+
+  if (!container) return;
+
+
+  const search =
+    document
+      .getElementById("patientSearch")
+      ?.value
+      .trim()
+      .toLowerCase() || "";
+
+
+  const filtered = patients.filter(patient =>
+    patient.name
+      .toLowerCase()
+      .includes(search)
+  );
+
+
+  if (!filtered.length) {
+
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">♙</div>
+        <h3>Nenhum paciente encontrado</h3>
+        <p>
+          ${
+            search
+              ? "Tente pesquisar por outro nome."
+              : "Cadastre seu primeiro paciente para começar."
+          }
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+
+  container.innerHTML = filtered
+    .map(patient => {
+
+      const birth = formatDate(patient.birth);
+
+      return `
+
+        <div class="patient-row">
+
+          <div class="patient-info">
+
+            <div class="patient-avatar">
+              ${getInitials(patient.name)}
+            </div>
+
+            <div>
+
+              <div class="patient-name">
+                ${escapeHTML(patient.name)}
+              </div>
+
+              <div class="patient-sub">
+
+                ${birth !== "Não informado"
+                  ? `Nascimento: ${birth}`
+                  : "Nascimento não informado"}
+
+                ${
+                  patient.complaint
+                    ? ` • ${escapeHTML(patient.complaint)}`
+                    : ""
+                }
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <button
+            class="text-btn"
+            onclick="selectPatient(${patient.id})"
+          >
+            Abrir →
+          </button>
+
+        </div>
+
+      `;
+
+    })
+    .join("");
+
+}
+
+
+/* =========================
+   SELECIONAR PACIENTE
+========================= */
+
+function selectPatient(id) {
+
+  const patient =
+    patients.find(p => p.id === id);
+
+  if (!patient) return;
+
+
+  const anamnesisSelect =
+    document.getElementById("anamnesisPatient");
+
+  const evolutionSelect =
+    document.getElementById("evolutionPatient");
+
+
+  if (anamnesisSelect) {
+    anamnesisSelect.value = patient.id;
+  }
+
+  if (evolutionSelect) {
+    evolutionSelect.value = patient.id;
+  }
+
+
+  showPage("anamnesis");
+
+}
+
+
+/* =========================
+   DASHBOARD
+========================= */
+
+function updateDashboard() {
+
+  const patientCount =
+    document.getElementById("patientCount");
+
+  const sessionCount =
+    document.getElementById("sessionCount");
+
+  const aiCount =
+    document.getElementById("aiCount");
+
+
+  if (patientCount) {
+    patientCount.textContent = patients.length;
+  }
+
+  if (sessionCount) {
+    sessionCount.textContent = evolutions.length;
+  }
+
+  if (aiCount) {
+    aiCount.textContent = aiRecords.length;
+  }
+
+
+  const recent =
+    document.getElementById("recentPatients");
+
+  if (!recent) return;
+
+
+  if (!patients.length) {
+
+    recent.innerHTML = `
+
+      <div class="empty-state">
+
+        <div class="empty-icon">♙</div>
+
+        <h3>Nenhum paciente cadastrado</h3>
+
+        <p>
+          Cadastre seu primeiro paciente
+          para começar.
+        </p>
+
+      </div>
+
+    `;
+
+    return;
+  }
+
+
+  recent.innerHTML =
+    patients
+      .slice(0, 5)
+      .map(patient => `
+
+        <div class="patient-row">
+
+          <div class="patient-info">
+
+            <div class="patient-avatar">
+              ${getInitials(patient.name)}
+            </div>
+
+            <div>
+
+              <div class="patient-name">
+                ${escapeHTML(patient.name)}
+              </div>
+
+              <div class="patient-sub">
+
+                ${
+                  escapeHTML(
+                    patient.complaint ||
+                    "Paciente cadastrado"
+                  )
+                }
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      `)
+      .join("");
+
+}
+
+
+/* =========================
+   SELECTS
+========================= */
+
+function populatePatientSelects() {
+
+  const selects = [
+
+    document.getElementById(
+      "anamnesisPatient"
+    ),
+
+    document.getElementById(
+      "evolutionPatient"
+    )
+
+  ];
+
+
+  selects.forEach(select => {
+
+    if (!select) return;
+
+
+    const currentValue =
+      select.value;
+
+
+    select.innerHTML = `
+      <option value="">
+        Selecione o paciente
+      </option>
+    `;
+
+
+    patients.forEach(patient => {
+
+      const option =
+        document.createElement("option");
+
+      option.value = patient.id;
+
+      option.textContent =
+        patient.name;
+
+      select.appendChild(option);
+
+    });
+
+
+    select.value = currentValue;
+
+  });
+
+}
+
+
+/* =========================
+   RECONHECIMENTO DE VOZ
+========================= */
+
+function startVoiceRecognition() {
+
+  const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+
+  if (!SpeechRecognition) {
+
+    showNotification(
+      "Seu navegador não suporta reconhecimento de voz. Use Google Chrome ou Microsoft Edge.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  if (recognition) {
+
+    recognition.stop();
+
+    return;
+  }
+
+
+  const button =
+    document.getElementById("voiceButton");
+
+  const status =
+    document.getElementById("voiceStatus");
+
+  const textarea =
+    document.getElementById("voiceText");
+
+
+  recognition =
+    new SpeechRecognition();
+
+  recognition.lang = "pt-BR";
+
+  recognition.continuous = true;
+
+  recognition.interimResults = false;
+
+
+  recognition.onstart = () => {
+
+    button?.classList.add("recording");
+
+    if (status) {
+      status.innerHTML =
+        "🔴 <strong>Gravando...</strong> fale normalmente.";
+    }
+
+  };
+
+
+  recognition.onresult = event => {
+
+    let transcript = "";
+
+    for (
+      let i = event.resultIndex;
+      i < event.results.length;
+      i++
+    ) {
+
+      if (event.results[i].isFinal) {
+
+        transcript +=
+          event.results[i][0].transcript;
+
+      }
+
+    }
+
+
+    if (transcript) {
+
+      const current =
+        textarea.value.trim();
+
+      textarea.value =
+        current
+          ? current + " " + transcript
+          : transcript;
+
+    }
+
+  };
+
+
+  recognition.onerror = event => {
+
+    console.error(
+      "Erro de reconhecimento:",
+      event.error
+    );
+
+    if (status) {
+      status.textContent =
+        "Não foi possível reconhecer a fala.";
+    }
+
+  };
+
+
+  recognition.onend = () => {
+
+    button?.classList.remove(
+      "recording"
+    );
+
+    if (status) {
+
+      status.textContent =
+        "Clique no microfone para continuar.";
+
+    }
+
+    recognition = null;
+
+  };
+
+
+  try {
+
+    recognition.start();
+
+  } catch (error) {
+
+    console.error(error);
+
+    recognition = null;
+
+  }
+
+}
+
+
+/* =========================
+   ANAMNESE + IA
+========================= */
+
+function processWithAI() {
+
+  const patientId =
+    document
+      .getElementById("anamnesisPatient")
+      .value;
+
+
+  const text =
+    document
+      .getElementById("voiceText")
+      .value
+      .trim();
+
+
+  if (!patientId) {
+
+    showNotification(
+      "Selecione um paciente.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  if (!text) {
+
+    showNotification(
+      "Digite ou grave o relato clínico.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const patient =
+    patients.find(
+      p => p.id == patientId
+    );
+
+
+  if (!patient) return;
+
+
+  const result =
+    generateClinicalStructure(
+      patient,
+      text
+    );
+
+
+  document.getElementById(
+    "aiResult"
+  ).innerHTML = result;
+
+
+  document
+    .getElementById("saveAnamnesis")
+    .classList.remove("hidden");
+
+
+  currentAnamnesis = {
+
+    patientId:
+      Number(patientId),
+
+    originalText:
+      text,
+
+    result
+
+  };
+
+
+  showNotification(
+    "Anamnese organizada. Revise antes de salvar.",
+    "success"
+  );
+
+}
+
+
+/* =========================
+   ESTRUTURA CLÍNICA
+========================= */
+
+function generateClinicalStructure(
+  patient,
+  text
+) {
+
+  const complaint =
+    patient.complaint ||
+    "Não informado";
+
+
+  return `
+
+    <div class="clinical-section">
+
+      <h3>Identificação</h3>
+
+      <p>
+        <strong>Paciente:</strong>
+        ${escapeHTML(patient.name)}
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Queixa principal</h3>
+
+      <p>
+        ${escapeHTML(complaint)}
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Relato da anamnese</h3>
+
+      <p>
+        ${escapeHTML(text)}
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Observações clínicas</h3>
+
+      <p>
+        Informações organizadas a partir
+        do relato informado. Revise todos
+        os dados antes de utilizar no
+        prontuário clínico.
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Plano / próximos passos</h3>
+
+      <p>
+        Realizar avaliação fisioterapêutica,
+        estabelecer objetivos terapêuticos
+        e definir a conduta conforme os
+        achados clínicos.
+      </p>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =========================
+   SALVAR ANAMNESE
+========================= */
+
+function saveAnamnesis() {
+
+  if (!currentAnamnesis) return;
+
+
+  anamneses.push({
+
+    id: Date.now(),
+
+    ...currentAnamnesis,
+
+    createdAt:
+      new Date().toISOString()
+
+  });
+
+
+  aiRecords.push({
+
+    id: Date.now(),
+
+    type: "anamnese",
+
+    createdAt:
+      new Date().toISOString()
+
+  });
+
+
+  saveData();
+
+
+  document.getElementById(
+    "voiceText"
+  ).value = "";
+
+
+  document.getElementById(
+    "aiResult"
+  ).innerHTML = `
+
+    <div class="empty-state">
+
+      <div class="empty-icon success">
+        ✓
+      </div>
+
+      <h3>Anamnese salva!</h3>
+
+      <p>
+        O registro foi armazenado
+        no prontuário local.
+      </p>
+
+    </div>
+
+  `;
+
+
+  document
+    .getElementById("saveAnamnesis")
+    .classList.add("hidden");
+
+
+  currentAnamnesis = null;
+
+
+  updateDashboard();
+
+
+  showNotification(
+    "Anamnese salva com sucesso!",
+    "success"
+  );
+
+}
+
+
+/* =========================
+   VOZ — EVOLUÇÃO
+========================= */
+
+function startEvolutionVoice() {
+
+  const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+
+  if (!SpeechRecognition) {
+
+    showNotification(
+      "Seu navegador não suporta reconhecimento de voz.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const recognitionEvolution =
+    new SpeechRecognition();
+
+
+  recognitionEvolution.lang =
+    "pt-BR";
+
+  recognitionEvolution.continuous =
+    false;
+
+  recognitionEvolution.interimResults =
+    false;
+
+
+  recognitionEvolution.onstart = () => {
+
+    showNotification(
+      "Gravando evolução...",
+      "success"
+    );
+
+  };
+
+
+  recognitionEvolution.onresult =
+    event => {
+
+      const text =
+        event.results[0][0]
+          .transcript;
+
+
+      const textarea =
+        document.getElementById(
+          "evolutionText"
+        );
+
+
+      const current =
+        textarea.value.trim();
+
+
+      textarea.value =
+        current
+          ? current + " " + text
+          : text;
+
+    };
+
+
+  recognitionEvolution.onerror =
+    () => {
+
+      showNotification(
+        "Não foi possível reconhecer a fala.",
+        "error"
+      );
+
+    };
+
+
+  recognitionEvolution.start();
+
+}
+
+
+/* =========================
+   GERAR EVOLUÇÃO
+========================= */
+
+function generateEvolution() {
+
+  const patientId =
+    document
+      .getElementById("evolutionPatient")
+      .value;
+
+
+  const text =
+    document
+      .getElementById("evolutionText")
+      .value
+      .trim();
+
+
+  const conduct =
+    document
+      .getElementById("conduct")
+      .value
+      .trim();
+
+
+  if (!patientId) {
+
+    showNotification(
+      "Selecione um paciente.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  if (!text) {
+
+    showNotification(
+      "Informe o relato da sessão.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const patient =
+    patients.find(
+      p => p.id == patientId
+    );
+
+
+  if (!patient) return;
+
+
+  const result = `
+
+    <div class="clinical-section">
+
+      <h3>Paciente</h3>
+
+      <p>
+        ${escapeHTML(patient.name)}
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Evolução</h3>
+
+      <p>
+        ${escapeHTML(text)}
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Conduta realizada</h3>
+
+      <p>
+        ${
+          escapeHTML(
+            conduct ||
+            "Não informado"
+          )
+        }
+      </p>
+
+    </div>
+
+
+    <div class="clinical-section">
+
+      <h3>Plano</h3>
+
+      <p>
+        Manter acompanhamento
+        fisioterapêutico e reavaliar
+        a resposta clínica na
+        próxima sessão.
+      </p>
+
+    </div>
+
+  `;
+
+
+  const resultBox =
+    document.getElementById(
+      "evolutionResult"
+    );
+
+
+  resultBox.innerHTML = result;
+
+  resultBox.classList.remove(
+    "hidden"
+  );
+
+
+  document
+    .getElementById("saveEvolution")
+    .classList.remove("hidden");
+
+
+  currentEvolution = {
+
+    patientId:
+      Number(patientId),
+
+    originalText:
+      text,
+
+    conduct,
+
+    result
+
+  };
+
+
+  showNotification(
+    "Evolução estruturada. Revise antes de salvar.",
+    "success"
+  );
+
+}
+
+
+/* =========================
+   SALVAR EVOLUÇÃO
+========================= */
+
+function saveEvolution() {
+
+  if (!currentEvolution) return;
+
+
+  evolutions.push({
+
+    id: Date.now(),
+
+    ...currentEvolution,
+
+    createdAt:
+      new Date().toISOString()
+
+  });
+
+
+  aiRecords.push({
+
+    id: Date.now(),
+
+    type: "evolucao",
+
+    createdAt:
+      new Date().toISOString()
+
+  });
+
+
+  saveData();
+
+
+  document.getElementById(
+    "evolutionText"
+  ).value = "";
+
+
+  document.getElementById(
+    "conduct"
+  ).value = "";
+
+
+  document
+    .getElementById("evolutionResult")
+    .classList.add("hidden");
+
+
+  document
+    .getElementById("saveEvolution")
+    .classList.add("hidden");
+
+
+  currentEvolution = null;
+
+
+  updateDashboard();
+
+
+  showNotification(
+    "Evolução salva com sucesso!",
+    "success"
+  );
+
+}
+
+
+/* =========================
+   STORAGE
+========================= */
+
+function saveData() {
+
+  localStorage.setItem(
+    "fisioia_patients",
+    JSON.stringify(patients)
+  );
+
+  localStorage.setItem(
+    "fisioia_anamneses",
+    JSON.stringify(anamneses)
+  );
+
+  localStorage.setItem(
+    "fisioia_evolutions",
+    JSON.stringify(evolutions)
+  );
+
+  localStorage.setItem(
+    "fisioia_ai_records",
+    JSON.stringify(aiRecords)
+  );
+
+}
+
+
+/* =========================
+   UTILITÁRIOS
+========================= */
+
+function getInitials(name) {
+
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(word => word.charAt(0))
+    .join("")
+    .toUpperCase();
+
+}
+
+
+function escapeHTML(text) {
+
+  const div =
+    document.createElement("div");
+
+  div.textContent =
+    text || "";
+
+  return div.innerHTML;
+
+}
+
+
+function formatDate(date) {
+
+  if (!date) {
+    return "Não informado";
+  }
+
+
+  const parts =
+    date.split("-");
+
+
+  if (parts.length !== 3) {
+    return "Não informado";
+  }
+
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+
+}
+
+
+/* =========================
+   NOTIFICAÇÕES
+========================= */
+
+function showNotification(
+  message,
+  type = "success"
+) {
+
+  let notification =
+    document.getElementById(
+      "fisioNotification"
+    );
+
+
+  if (!notification) {
+
+    notification =
+      document.createElement("div");
+
+    notification.id =
+      "fisioNotification";
+
+    notification.className =
+      "notification";
+
+    document.body.appendChild(
+      notification
+    );
+
+  }
+
+
+  notification.className =
+    `notification ${type}`;
+
+
+  notification.innerHTML = `
+
+    <span>
+      ${
+        type === "success"
+          ? "✓"
+          : "!"
+      }
+    </span>
+
+    <p>
+      ${escapeHTML(message)}
+    </p>
+
+  `;
+
+
+  requestAnimationFrame(() => {
+
+    notification.classList.add(
+      "show"
+    );
+
+  });
+
+
+  clearTimeout(
+    notification.hideTimeout
+  );
+
+
+  notification.hideTimeout =
+    setTimeout(() => {
+
+      notification.classList.remove(
+        "show"
+      );
+
+    }, 3500);
+
+}
+```
