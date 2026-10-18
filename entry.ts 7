@@ -1,0 +1,63 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+
+export default async function(req) {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const { audio_url } = body;
+    if (!audio_url) return Response.json({ error: 'audio_url é obrigatório' }, { status: 400 });
+
+    // 1. Transcreve o áudio
+    const transcription = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url });
+    const transcript = transcription.text || '';
+
+    if (!transcript || transcript.trim().length === 0) {
+      return Response.json({ error: 'Não foi possível transcrever o áudio. Tente novamente.' }, { status: 422 });
+    }
+
+    // 2. Estrutura os dados com IA
+    const prompt = `Você é um assistente especializado em fisioterapia. Analise a seguinte transcrição de uma anamnese fisioterapêutica (ditada por voz pelo fisioterapeuta) e extraia/estruture os dados clínicos em campos organizados. Se um campo não for mencionado, preencha com "Não informado". A escala de dor deve ser um número inteiro de 0 a 10 (se não mencionado, use 0).
+
+Transcrição:
+"""
+${transcript}
+"""
+
+Retorne os dados estruturados conforme o schema. O resumo (ai_summary) deve ser um parágrafo clínico conciso com os principais achados.`;
+
+    const structured = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          chief_complaint: { type: 'string', description: 'Queixa principal do paciente' },
+          history: { type: 'string', description: 'História da moléstia atual e antecedentes' },
+          pain_scale: { type: 'number', description: 'Escala de dor de 0 a 10' },
+          mobility: { type: 'string', description: 'Avaliação de mobilidade e amplitude de movimento' },
+          medications: { type: 'string', description: 'Medicamentos em uso' },
+          aggravating_factors: { type: 'string', description: 'Fatores que pioram o quadro' },
+          relieving_factors: { type: 'string', description: 'Fatores que melhoram o quadro' },
+          ai_summary: { type: 'string', description: 'Resumo clínico estruturado' }
+        },
+        required: ['chief_complaint', 'history', 'pain_scale', 'mobility', 'medications', 'aggravating_factors', 'relieving_factors', 'ai_summary']
+      }
+    });
+
+    return Response.json({
+      transcript,
+      chief_complaint: structured.chief_complaint || 'Não informado',
+      history: structured.history || 'Não informado',
+      pain_scale: typeof structured.pain_scale === 'number' ? structured.pain_scale : 0,
+      mobility: structured.mobility || 'Não informado',
+      medications: structured.medications || 'Não informado',
+      aggravating_factors: structured.aggravating_factors || 'Não informado',
+      relieving_factors: structured.relieving_factors || 'Não informado',
+      ai_summary: structured.ai_summary || ''
+    });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+}
