@@ -1,0 +1,66 @@
+{
+  "name": "Session",
+  "type": "object",
+  "properties": {
+    "patient_id": {
+      "type": "string",
+      "title": "Paciente"
+    },
+    "patient_name": {
+      "type": "string",
+      "title": "Nome do Paciente"
+    },
+    "session_date": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Data da Sess\u00e3o"
+    },
+    "audio_url": {
+      "type": "string",
+      "title": "\u00c1udio"
+    },
+    "duration_sec": {
+      "type": "number",
+      "title": "Dura\u00e7\u00e3o (s)"
+    },
+    "transcript": {
+      "type": "string",
+      "title": "Transcri\u00e7\u00e3o"
+    },
+    "chief_complaint": {
+      "type": "string",
+      "title": "Queixa Principal"
+    },
+    "history": {
+      "type": "string",
+      "title": "Hist\u00f3rico"
+    },
+    "pain_scale": {
+      "type": "number",
+      "title": "Escala de Dor (0-10)"
+    },
+    "mobility": {
+      "type": "string",
+      "title": "Mobilidade"
+    },
+    "medications": {
+      "type": "string",
+      "title": "Medicamentos"
+    },
+    "aggravating_factors": {
+      "type": "string",
+      "title": "Fatores de Piora"
+    },
+    "relieving_factors": {
+      "type": "string",
+      "title": "Fatores de Melhora"
+    },
+    "ai_summary": {
+      "type": "string",
+      "title": "Resumo IA"
+    }
+  },
+  "required": [
+    "patient_id"
+  ]
+}
